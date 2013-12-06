@@ -1,0 +1,14 @@
+<li class="list-group-item">
+  <form action="{{ url_for('.on', gh_id=repo.gh_id) }}" method="POST" id="{{ repo_type }}-{{ repo.id }}">
+    {{ repo.gh_full_name }}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="hidden" name="repo_full_name" value="{{ repo.name }}">
+    {% if repo.gh_id in existing_projects %}
+      <small style="color: #777;">Project for this repository already exists. You will be able</small>
+      <button type="submit" class="btn btn-sm btn-default disabled">Request invite</button>
+      <small style="color: #777;">soon.</small>
+    {% else %}
+      <button type="submit" class="btn btn-sm btn-default">Create project</button>
+    {% endif %}
+  </form>
+</li>

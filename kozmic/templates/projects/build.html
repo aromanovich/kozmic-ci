@@ -1,0 +1,89 @@
+{% extends 'projects/_base.html' %}
+
+{% if id_or_latest == 'latest' %}
+  {% set active_tab = 'latest-build' %}
+{% else %}
+  {% set active_tab = 'build' %}
+  {% set extra_tabs = [
+    (
+        url_for('.build', project_id=project.id, id_or_latest=id_or_latest),
+        'build',
+        'Build #{}'.format(id_or_latest)
+    ),
+  ] -%}
+{% endif %}
+
+{% block content %}
+  <dl class="dl-horizontal">
+    <dt>#</dt>
+    <dd>{{ build.id }}</dd>
+    <dt>Status</dt>
+    <dd>
+      <span class="label
+        label-{% if build.status == 'success' %}success{% elif build.status == 'failed' %}danger{% else %}default{% endif %}">
+        {{ build.status|capitalize }}
+      </span>
+    </dd>
+    <dt>Started at</dt>
+    <dd>{{ build.started_at }}</dd>
+    <dt>Finished at</dt>
+    <dd>{{ build.finished_at }}</dd>
+    <dt>Author</dt>
+    <dd>{{ build.gh_commit_author }}</dd>
+    <dt>Commit message</dt>
+    <dd>{{ build.gh_commit_message }}</dd>
+    <dt>Commit SHA</dt>
+    <dd>{{ build.gh_commit_sha }}</dd>
+  </dl>
+
+  {% for step in build.steps %}
+    <h4>{{ step.hook_call.hook.title }} hook</h4>
+    <dl>
+      <dt>Started at</dt>
+      <dd>{{ step.started_at }}</dd>
+      <dt>Finished at</dt>
+      <dd>{{ step.finished_at }}</dd>
+      <dt>Return code</dt>
+      <dd>{{ step.return_code }}</dd>
+      <dt>
+        Output (<a href="{{ url_for('.build_step_stdout', project_id=project.id,
+                                    id=step.id) }}">download</a>)
+      </dt>
+      <dd>
+
+        {% with id='build-step-{}-log'.format(step.id) %}
+          <pre id="{{ id }}" style="max-height: 300px; overflow: auto;">{{ step.stdout or '' }}</pre>
+      {% if not step.finished_at %}
+<script language="javascript">
+    var s = new WebSocket(
+        '{{ tailer_url_template.format(task_uuid=step.task_uuid) }}');
+
+    s.onopen = function() {
+        console.debug('connected');
+    };
+
+    s.onmessage = function(message) {
+        var data = $.parseJSON(message.data)
+        if (data.type == 'message') {
+            var log = $('#{{ id }}');
+            log.scrollTop(log[0].scrollHeight);
+            log[0].innerHTML += data.content;
+        } else if (data.type == 'status' && data.content == 'finished') {
+            location.reload();
+        }
+    };
+    
+    s.onerror = function(e) {
+        console.error(e);
+    };
+
+    s.onclose = function(e) {
+        console.debug('closed');
+    };
+</script>
+        {% endif %}
+        {% endwith %}
+      </dd>
+    </dl>
+  {% endfor %}
+{% endblock %}

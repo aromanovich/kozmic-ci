@@ -1,0 +1,38 @@
+{% extends 'projects/_base.html' %}
+{% set active_tab = 'build-history' %}
+
+{% block content %}
+<table class="table">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Status</th>
+      <th>Started at</th>
+      <th>Finished at</th>
+      <th>Commit SHA</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for build in builds %}
+      <tr>
+        <td>{{ build.number }}</td>
+        <td>
+          <span class="label
+            label-{% if build.status == 'success' %}success{% elif build.status == 'failed' %}danger{% else %}default{% endif %}">
+            {{ build.status|capitalize }}
+          </span>
+        </td>
+        <td>{{ build.started_at }}</td>
+        <td>{{ build.finished_at }}</td>
+        <td>{{ build.gh_commit_sha }}</td>
+        <td>
+          <a href="{{ url_for('.build', project_id=project.id, id_or_latest=build.id) }}" class="btn btn-default">
+            Show
+          </a>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

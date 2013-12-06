@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Kozmic</title>
+    <style>
+      body {
+        padding: 30px;
+      }
+
+      .navbar {
+        margin-bottom: 30px;
+      }
+    </style>
+    <script src="/static/js/jquery.js"></script>
+    <script src="/static/js/bootstrap.js"></script>
+    <link rel="stylesheet" href="/static/css/bootstrap.css">
+    {% block extra_head %}
+    {% endblock %}
+  </head>
+  <body>
+    <nav class="navbar navbar-inverse" role="navigation"
+      style="background:url('/static/img/milky-way-galaxy.jpg');
+             background-position:0 210px;">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="{{ url_for('core.index') }}">Kozmic CI &alpha;</a>
+      </div>
+
+      <div class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li class="dropdown">
+            <a href="#" class="dropdown-toggle" data-toggle="dropdown"style="padding:6px 16px;" >
+              <img src="{{ current_user.gh_avatar_url }}" height="38" class="img-circle">
+              &nbsp;{{ current_user.gh_name }} <b class="caret"></b>
+            </a>
+            <ul class="dropdown-menu">
+              <li><a href="{{ url_for('core.repos') }}">Repositories</a></li>
+              <li class="divider"></li>
+              <li><a href="{{ url_for('users.logout') }}">Sign out</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </nav>
+    <div class="container">
+      {% block container %}
+      {% endblock %}
+    </div>
+  </body>
+</html>

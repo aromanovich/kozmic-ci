@@ -1,0 +1,6 @@
+# coding: utf-8
+from .config import TestingConfig
+
+
+class KozmicTestingConfig(TestingConfig):
+    SQLALCHEMY_DATABASE_URI = 'mysql://root:@127.0.0.1/kozmic_test'

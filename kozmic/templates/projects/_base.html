@@ -1,0 +1,60 @@
+{% extends '_base.html' %}
+
+{% block container %}
+  <div class="row">
+    <div class="col-md-3">
+      <div class="list-group">
+        {% for project, latest_build in
+            current_user.get_available_projects(annotate_with_latest_builds=True) %}
+          <a href="{{ url_for('.show', id=project.id) }}" class="list-group-item">
+            <h4 class="list-group-item-heading">{{ project.gh_full_name }}</h4>
+            Latest build:
+            {% if latest_build %}
+              {{ latest_build.created_at }}
+            {% else %}
+              never
+            {% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="col-md-9">
+      {% set tabs = [
+          (url_for('.build', project_id=project.id, id_or_latest='latest'),
+                   'latest-build', 'Latest build'),
+          (url_for('.history', id=project.id), 'build-history', 'Build history'),
+          (url_for('.settings', id=project.id), 'settings', 'Settings'),
+      ] -%}
+      {% set extra_tabs = extra_tabs|default([]) -%}
+      {% set active_tab = active_tab|default('latest-build') -%}
+      <h2 style="margin-top:0;">{{ project.gh_full_name }}</h2>
+      <ul class="nav nav-tabs">
+        {% for href, id, caption in tabs %}
+          <li{% if id == active_tab %} class="active"{% endif %}>
+            <a href="{{ href|e }}">{{ caption|e }}</a>
+          </li>
+        {% endfor %}
+
+        {% for href, id, caption in extra_tabs %}
+          <li{% if id == active_tab %} class="active"{% endif %}>
+            <a href="{{ href|e }}">{{ caption|e }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+      
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <p>
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </p>
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}
+      {% endblock %}
+    </div>
+  </div>
+{% endblock %}

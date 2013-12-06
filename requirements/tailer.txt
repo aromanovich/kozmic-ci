@@ -1,0 +1,8 @@
+# Note: cython is needed to compile gevent. It is not
+# included here because of the weird unidentified bug
+# (probably it's easier to wait until gevent 1.0 will be
+# officially released).
+
+git+git://github.com/surfly/gevent.git@1.0rc3#egg=gevent
+uWSGI==1.9.18.2
+redis==2.8.0

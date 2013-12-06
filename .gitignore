@@ -1,0 +1,4 @@
+.coverage
+kozmic/*.sqlite
+docs/build
+misc
