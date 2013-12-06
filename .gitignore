@@ -1,4 +1,4 @@
 .coverage
-kozmic/*.sqlite
+kozmic/config_local.py
 docs/build
 misc
