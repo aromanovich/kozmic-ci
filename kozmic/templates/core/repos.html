@@ -3,7 +3,7 @@
 {% block container %}
   <script>
     $(function() {
-    $('#namespaces a').click(function (e) {
+      $('#namespaces a').click(function (e) {
         e.preventDefault();
         $(this).tab('show');
       });
@@ -20,7 +20,7 @@
     </a>
     <br>
     <small>
-    Last synchronized from GitHub: {{ current_user.repos_last_synchronized_at or 'never' }}.
+      Last synchronized from GitHub: {{ current_user.repos_last_synchronized_at or 'never' }}.
     </small>
   </div>
 

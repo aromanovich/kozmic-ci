@@ -1,1 +1,10 @@
-<a href="{{ url_for('users.auth') }}" rel="nofollow" class="btn btn-large">Sign up with GitHub</a>
+{% extends '_base.html' %}
+
+{% block body %}
+  <div id="splash">
+    <h1>Kozmic CI</h1>
+    <a href="{{ url_for('users.auth') }}" rel="nofollow" class="btn" id="sign-up">
+      Sign up with GitHub
+    </a>
+  </div>
+{% endblock %}

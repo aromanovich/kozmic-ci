@@ -6,9 +6,9 @@
   {% set active_tab = 'build' %}
   {% set extra_tabs = [
     (
-        url_for('.build', project_id=project.id, id_or_latest=id_or_latest),
-        'build',
-        'Build #{}'.format(id_or_latest)
+      url_for('.build', project_id=project.id, id_or_latest=id_or_latest),
+      'build',
+      'Build #{}'.format(id_or_latest)
     ),
   ] -%}
 {% endif %}
@@ -50,38 +50,39 @@
                                     id=step.id) }}">download</a>)
       </dt>
       <dd>
-
         {% with id='build-step-{}-log'.format(step.id) %}
-          <pre id="{{ id }}" style="max-height: 300px; overflow: auto;">{{ step.stdout or '' }}</pre>
-      {% if not step.finished_at %}
-<script language="javascript">
-    var s = new WebSocket(
-        '{{ tailer_url_template.format(task_uuid=step.task_uuid) }}');
+          <pre id="{{ id }}" class="build-step-log">
+            {{ step.stdout or '' }}
+          </pre>
+          {% if not step.finished_at %}
+            <script language="javascript">
+                var s = new WebSocket(
+                    '{{ tailer_url_template.format(task_uuid=step.task_uuid) }}');
 
-    s.onopen = function() {
-        console.debug('connected');
-    };
+                s.onopen = function() {
+                    console.debug('connected');
+                };
 
-    s.onmessage = function(message) {
-        var data = $.parseJSON(message.data)
-        if (data.type == 'message') {
-            var log = $('#{{ id }}');
-            log.scrollTop(log[0].scrollHeight);
-            log[0].innerHTML += data.content;
-        } else if (data.type == 'status' && data.content == 'finished') {
-            location.reload();
-        }
-    };
-    
-    s.onerror = function(e) {
-        console.error(e);
-    };
+                s.onmessage = function(message) {
+                    var data = $.parseJSON(message.data)
+                    if (data.type == 'message') {
+                        var log = $('#{{ id }}');
+                        log.scrollTop(log[0].scrollHeight);
+                        log[0].innerHTML += data.content;
+                    } else if (data.type == 'status' && data.content == 'finished') {
+                        location.reload();
+                    }
+                };
+                
+                s.onerror = function(e) {
+                    console.error(e);
+                };
 
-    s.onclose = function(e) {
-        console.debug('closed');
-    };
-</script>
-        {% endif %}
+                s.onclose = function(e) {
+                    console.debug('closed');
+                };
+            </script>
+          {% endif %}
         {% endwith %}
       </dd>
     </dl>
