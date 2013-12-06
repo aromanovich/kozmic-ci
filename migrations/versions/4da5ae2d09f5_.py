@@ -1,13 +1,13 @@
 """empty message
 
-Revision ID: 1dab4d9e33f4
+Revision ID: 4da5ae2d09f5
 Revises: None
-Create Date: 2013-11-26 23:11:28.923375
+Create Date: 2013-12-07 00:36:44.507321
 
 """
 
 # revision identifiers, used by Alembic.
-revision = '1dab4d9e33f4'
+revision = '4da5ae2d09f5'
 down_revision = None
 
 from alembic import op
@@ -28,6 +28,25 @@ def upgrade():
     sa.UniqueConstraint('gh_id'),
     sa.UniqueConstraint('gh_login')
     )
+    op.create_table('user_repository',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('gh_id', sa.Integer(), nullable=False),
+    sa.Column('gh_name', sa.String(length=200), nullable=False),
+    sa.Column('gh_full_name', sa.String(length=200), nullable=False),
+    sa.Column('gh_clone_url', sa.String(length=200), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('organization',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('gh_id', sa.Integer(), nullable=False),
+    sa.Column('gh_login', sa.String(length=200), nullable=False),
+    sa.Column('gh_name', sa.String(length=200), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('project',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('owner_id', sa.Integer(), nullable=False),
@@ -43,24 +62,13 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('gh_id')
     )
-    op.create_table('organization',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('gh_id', sa.Integer(), nullable=False),
-    sa.Column('gh_login', sa.String(length=200), nullable=False),
-    sa.Column('gh_name', sa.String(length=200), nullable=False),
+    op.create_table('project_members',
+    sa.Column('project_id', sa.Integer(), nullable=True),
+    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['project_id'], ['project.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('user_repository',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('gh_id', sa.Integer(), nullable=False),
-    sa.Column('gh_name', sa.String(length=200), nullable=False),
-    sa.Column('gh_full_name', sa.String(length=200), nullable=False),
-    sa.Column('gh_clone_url', sa.String(length=200), nullable=False),
-    sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint()
     )
     op.create_table('build',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -75,13 +83,15 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('gh_commit_sha')
     )
-    op.create_table('project_members',
-    sa.Column('project_id', sa.Integer(), nullable=True),
-    sa.Column('user_id', sa.Integer(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['project_id'], ['project.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
-    sa.PrimaryKeyConstraint()
+    op.create_table('organization_repository',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('gh_id', sa.Integer(), nullable=False),
+    sa.Column('gh_name', sa.String(length=200), nullable=False),
+    sa.Column('gh_full_name', sa.String(length=200), nullable=False),
+    sa.Column('gh_clone_url', sa.String(length=200), nullable=False),
+    sa.Column('organization_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['organization_id'], ['organization.id'], ),
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('hook',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -93,22 +103,12 @@ def upgrade():
     sa.ForeignKeyConstraint(['project_id'], ['project.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('organization_repository',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('gh_id', sa.Integer(), nullable=False),
-    sa.Column('gh_name', sa.String(length=200), nullable=False),
-    sa.Column('gh_full_name', sa.String(length=200), nullable=False),
-    sa.Column('gh_clone_url', sa.String(length=200), nullable=False),
-    sa.Column('organization_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['organization_id'], ['organization.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('hook_call',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('hook_id', sa.Integer(), nullable=False),
+    sa.Column('hook_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('gh_payload', sa.PickleType(), nullable=False),
-    sa.ForeignKeyConstraint(['hook_id'], ['hook.id'], ),
+    sa.ForeignKeyConstraint(['hook_id'], ['hook.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('build_step',
@@ -131,12 +131,12 @@ def downgrade():
     ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('build_step')
     op.drop_table('hook_call')
-    op.drop_table('organization_repository')
     op.drop_table('hook')
-    op.drop_table('project_members')
+    op.drop_table('organization_repository')
     op.drop_table('build')
-    op.drop_table('user_repository')
-    op.drop_table('organization')
+    op.drop_table('project_members')
     op.drop_table('project')
+    op.drop_table('organization')
+    op.drop_table('user_repository')
     op.drop_table('user')
     ### end Alembic commands ###

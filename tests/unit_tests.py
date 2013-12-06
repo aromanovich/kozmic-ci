@@ -153,6 +153,24 @@ class TestBuildDB(TestCase):
         assert build_2.number == 2
 
 
+class TestHookDB(TestCase):
+    def test_delete_cascade(self):
+        """Tests that hook calls are preserved on hook delete."""
+        user = factories.UserFactory.create()
+        project = factories.ProjectFactory.create(owner=user)
+        hook = factories.HookFactory.create(project=project)
+        hook_calls = factories.HookCallFactory.create_batch(3, hook=hook)
+
+        for hook_call in hook_calls:
+            assert hook_call.hook_id == hook.id
+
+        db.session.delete(hook)
+        db.session.commit()
+        
+        for hook_call in hook_calls:
+            assert hook_call.hook_id is None
+
+
 KOZMIC_BLUES = '''
 Time keeps movin' on,
 Friends they turn away.

@@ -288,7 +288,7 @@ class Hook(db.Model):
 class HookCall(db.Model):
     """Reflects a fact that GitHub triggered a project hook."""
     id = db.Column(db.Integer, primary_key=True)
-    hook_id = db.Column(db.Integer, db.ForeignKey('hook.id'), nullable=False)
+    hook_id = db.Column(db.Integer, db.ForeignKey('hook.id', ondelete='SET NULL'))
 
     #: Created at
     created_at = db.Column(db.DateTime, nullable=False,
