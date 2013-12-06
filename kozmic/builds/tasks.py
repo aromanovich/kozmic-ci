@@ -11,20 +11,13 @@ import tailf
 import docker
 import redis
 from flask import current_app
+from celery.utils.log import get_task_logger
 
 from kozmic import db, celery
 from kozmic.models import Build, BuildStep, HookCall
 
 
-formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s: %(message)s')
-
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(console_handler)
+logger = get_task_logger(__name__)
 
 
 @contextlib.contextmanager
