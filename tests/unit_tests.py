@@ -1,4 +1,5 @@
 # coding: utf-8
+import os
 import time
 import unittest
 import tempfile
@@ -6,8 +7,9 @@ import tempfile
 import redis
 import mock
 import httpretty
-from flask.ext.principal import Need
 from flask import current_app
+from flask.ext.principal import Need
+from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
 from kozmic.models import db, User, Project, Build
@@ -198,7 +200,7 @@ class TestTailer(TestCase):
             tailer.start()
             time.sleep(.5)
             
-            # Skip "subscribe" message
+            # Skip "subscribe" message that looks like this:
             # {'channel': 'test', 'data': 1L, 'pattern': None, 'type': 'subscribe'}
             listener.next()
 
@@ -209,3 +211,57 @@ class TestTailer(TestCase):
 
         time.sleep(.5)
         assert KOZMIC_BLUES + '\n' == ''.join(redis_client.lrange('test', 0, -1))
+
+
+class BuilderStub(kozmic.builds.tasks.Builder):
+    def run(self):
+        time.sleep(1)
+
+        build_log_path = os.path.join(self._build_dir, 'build.log')
+        with open(build_log_path, 'w') as build_log:
+            build_log.write('Everything went great!\nGood bye.')
+
+        self.return_code = 0
+
+
+class TestBuildTask(TestCase):
+    def setup_method(self, method):
+        TestCase.setup_method(self, method)
+
+        self.user = factories.UserFactory.create()
+        self.project = factories.ProjectFactory.create(owner=self.user)
+        self.hook = factories.HookFactory.create(project=self.project)
+        self.hook_call = factories.HookCallFactory.create(hook=self.hook)
+        self.build = factories.BuildFactory.create(project=self.project)
+
+    def test_do_build(self):
+        with SessionScope(self.db):
+            set_status_patcher = mock.patch.object(Build, 'set_status')
+            builder_patcher = mock.patch('kozmic.builds.tasks.Builder', new=BuilderStub)
+            tailer_patcher = mock.patch('kozmic.builds.tasks.Tailer')
+
+            set_status_mock = set_status_patcher.start()
+            builder_patcher.start()
+            tailer_patcher.start()
+            try:
+                kozmic.builds.tasks.do_build(build_id=self.build.id,
+                                             hook_call_id=self.hook_call.id)
+            finally:
+                tailer_patcher.stop()
+                builder_patcher.stop()
+                set_status_patcher.stop()
+        self.db.session.rollback()
+        
+        assert self.build.steps.count() == 1
+        build_step = self.build.steps.first()
+        assert build_step.return_code == 0
+        assert build_step.stdout == 'Everything went great!\nGood bye.'
+        build_id = self.build.id
+        set_status_mock.assert_has_calls([
+            mock.call(
+                'pending',
+                description='Kozmic build #{} is pending.'.format(build_id)),
+            mock.call(
+                'success',
+                description='Kozmic build #{} has passed.'.format(build_id)),
+        ])

@@ -103,7 +103,7 @@ class Builder(threading.Thread):
 
     def run(self):
         logger.info('Builder has started.')
-        
+
         build_dir_path = lambda f: os.path.join(self._build_dir, f)
 
         build_starter_sh_path = build_dir_path('build-starter.sh')
@@ -130,17 +130,18 @@ class Builder(threading.Thread):
             build_script.write(self._shell_code)
 
         client = docker.Client()
+
         logger.info('Pulling %s image...', self._docker_image)
         client.pull(self._docker_image)
         logger.info('%s image has been pulled.', self._docker_image)
+
         container = client.create_container(
             self._docker_image,
             command='bash /kozmic/build-starter.sh',
             volumes={'/kozmic': {}})
-
         client.start(container, binds={self._build_dir: '/kozmic'})
-        logger.info('Docker process %s has started.', container)
 
+        logger.info('Docker process %s has started.', container)
         self.return_code = client.wait(container)
         logger.info(client.logs(container))
         logger.info('Docker process %s has finished with return code %i.',
