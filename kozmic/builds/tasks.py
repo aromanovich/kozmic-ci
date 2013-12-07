@@ -84,6 +84,12 @@ stdbuf -o0 bash ../build-script.sh > ../build.log
 
 ASKPASS_SH = '''
 #!/bin/bash
+if [[ "$1" == *"Bad passphrase, try again"* ]]; then
+  # If we don't exit on "bad passphrase", ssh-add will
+  # never stop calling this script.
+  exit 1
+fi
+
 echo {passphrase}
 '''.strip()
 

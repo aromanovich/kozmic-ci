@@ -229,23 +229,27 @@ git commit -m "Initial commit"
 
 @pytest.mark.docker
 class TestBuilder(TestCase):
+    def _init_repo(self, repo_dir):
+        subprocess.call(
+            CREATE_TEST_REPO_SH.format(repo_dir=repo_dir), shell=True)
+        return subprocess.check_output(
+            'cd {} && git rev-parse HEAD'.format(repo_dir),
+            shell=True
+        ).strip()
+
+    def _generate_private_key(self, passphrase):
+        rsa_key = RSA.generate(1024)
+        return rsa_key.exportKey(format='PEM', passphrase=passphrase)
+
     def test_builder(self):
         passphrase = 'passphrase'
-        rsa_key = RSA.generate(1024)
-        rsa_private_key = rsa_key.exportKey(format='PEM', passphrase=passphrase)
+        private_key = self._generate_private_key(passphrase)
 
         with kozmic.builds.tasks.create_temp_dir() as build_dir:
-            repo_dir = os.path.join(build_dir, 'test-repo')
-
-            subprocess.call(
-                CREATE_TEST_REPO_SH.format(repo_dir=repo_dir), shell=True)
-            sha = subprocess.check_output(
-                'cd {} && git rev-parse HEAD'.format(repo_dir),
-                shell=True
-            ).strip()
+            sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
 
             builder = kozmic.builds.tasks.Builder(
-                rsa_private_key=rsa_private_key,
+                rsa_private_key=private_key,
                 passphrase=passphrase,
                 docker_image='aromanovich/ubuntu-kozmic',
                 shell_code='bash ./kozmic.sh',
@@ -253,11 +257,32 @@ class TestBuilder(TestCase):
                 clone_url='/kozmic/test-repo',
                 sha=sha)
             builder.run()
+
             log_path = os.path.join(build_dir, 'build.log')
             with open(log_path, 'r') as log:
                 stdout = log.read().strip()
 
+        assert builder.return_code == 0
         assert stdout == 'Hello!'
+
+    def test_builder_with_wrong_passphrase(self):
+        """Tests that Builder does not hang being called
+        with a wrong passphrase.
+        """
+        with kozmic.builds.tasks.create_temp_dir() as build_dir:
+            sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
+
+            builder = kozmic.builds.tasks.Builder(
+                rsa_private_key=self._generate_private_key('passphrase'),
+                passphrase='wrong-passpharse',
+                docker_image='aromanovich/ubuntu-kozmic',
+                shell_code='bash ./kozmic.sh',
+                build_dir=build_dir,
+                clone_url='/kozmic/test-repo',
+                sha=sha)
+            builder.run()
+
+        assert builder.return_code == 1
 
 
 class BuilderStub(kozmic.builds.tasks.Builder):
