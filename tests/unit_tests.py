@@ -274,7 +274,7 @@ class TestBuilder(TestCase):
 
             builder = kozmic.builds.tasks.Builder(
                 rsa_private_key=self._generate_private_key('passphrase'),
-                passphrase='wrong-passpharse',
+                passphrase='wrong-passphrase',
                 docker_image='aromanovich/ubuntu-kozmic',
                 shell_code='bash ./kozmic.sh',
                 build_dir=build_dir,

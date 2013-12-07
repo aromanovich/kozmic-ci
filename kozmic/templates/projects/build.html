@@ -46,14 +46,15 @@
       <dt>Return code</dt>
       <dd>{{ step.return_code }}</dd>
       <dt>
-        Output (<a href="{{ url_for('.build_step_stdout', project_id=project.id,
-                                    id=step.id) }}">download</a>)
+        Output 
+        {% if step.finished_at %}
+          (<a href="{{ url_for('.build_step_stdout', project_id=project.id,
+                               id=step.id) }}">download</a>)
+        {% endif %}
       </dt>
       <dd>
         {% with id='build-step-{}-log'.format(step.id) %}
-          <pre id="{{ id }}" class="build-step-log">
-            {{ step.stdout or '' }}
-          </pre>
+          <pre id="{{ id }}" class="build-step-log">{{ step.stdout or '' }}</pre>
           {% if not step.finished_at %}
             <script language="javascript">
                 var s = new WebSocket(

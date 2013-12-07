@@ -32,10 +32,13 @@ def show(id):
 @bp.route('/<int:id>/history/')
 def history(id):
     project = Project.query.get_or_404(id)
+    builds = project.builds.order_by(Build.id.desc()).all()
+    if not builds:
+        return redirect(url_for('.settings', id=id))
     return render_template(
         'projects/history.html',
         project=project,
-        builds=project.builds.order_by(Build.id.desc()))
+        builds=builds)
 
 
 @bp.route('/<int:project_id>/builds/<id_or_latest>/')
@@ -44,12 +47,14 @@ def build(project_id, id_or_latest):
     
     if id_or_latest == 'latest':
         build = project.latest_build
+        if not build:
+            return redirect(url_for('.settings', id=project_id))
     else:
         try:
             build_id = int(id_or_latest)
         except ValueError:
             abort(404)
-        build = project.builds.filter_by(id=build_id).first()
+        build = project.builds.filter_by(id=build_id).first_or_404()
 
     return render_template(
         'projects/build.html',
