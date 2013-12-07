@@ -3,10 +3,13 @@ import os
 import time
 import unittest
 import tempfile
+import subprocess
 
+import httpretty
+import pytest
 import redis
 import mock
-import httpretty
+from Crypto.PublicKey import RSA
 from flask import current_app
 from flask.ext.principal import Need
 from flask.ext.webtest import SessionScope
@@ -168,7 +171,7 @@ class TestHookDB(TestCase):
 
         db.session.delete(hook)
         db.session.commit()
-        
+
         for hook_call in hook_calls:
             assert hook_call.hook_id is None
 
@@ -199,7 +202,7 @@ class TestTailer(TestCase):
             tailer = kozmic.builds.tasks.Tailer(f.name, redis_client, 'test')
             tailer.start()
             time.sleep(.5)
-            
+
             # Skip "subscribe" message that looks like this:
             # {'channel': 'test', 'data': 1L, 'pattern': None, 'type': 'subscribe'}
             listener.next()
@@ -211,6 +214,50 @@ class TestTailer(TestCase):
 
         time.sleep(.5)
         assert KOZMIC_BLUES + '\n' == ''.join(redis_client.lrange('test', 0, -1))
+
+
+CREATE_TEST_REPO_SH = '''
+git init {repo_dir}
+cd {repo_dir}
+git config user.email "author@example.com>"
+git config user.name "A U Thore"
+echo "echo Hello!" > ./kozmic.sh
+git add ./kozmic.sh
+git commit -m "Initial commit"
+'''
+
+
+@pytest.mark.docker
+class TestBuilder(TestCase):
+    def test_builder(self):
+        passphrase = 'passphrase'
+        rsa_key = RSA.generate(1024)
+        rsa_private_key = rsa_key.exportKey(format='PEM', passphrase=passphrase)
+
+        with kozmic.builds.tasks.create_temp_dir() as build_dir:
+            repo_dir = os.path.join(build_dir, 'test-repo')
+
+            subprocess.call(
+                CREATE_TEST_REPO_SH.format(repo_dir=repo_dir), shell=True)
+            sha = subprocess.check_output(
+                'cd {} && git rev-parse HEAD'.format(repo_dir),
+                shell=True
+            ).strip()
+
+            builder = kozmic.builds.tasks.Builder(
+                rsa_private_key=rsa_private_key,
+                passphrase=passphrase,
+                docker_image='aromanovich/ubuntu-kozmic',
+                shell_code='bash ./kozmic.sh',
+                build_dir=build_dir,
+                clone_url='/kozmic/test-repo',
+                sha=sha)
+            builder.run()
+            log_path = os.path.join(build_dir, 'build.log')
+            with open(log_path, 'r') as log:
+                stdout = log.read().strip()
+
+        assert stdout == 'Hello!'
 
 
 class BuilderStub(kozmic.builds.tasks.Builder):
@@ -251,7 +298,7 @@ class TestBuildTask(TestCase):
                 builder_patcher.stop()
                 set_status_patcher.stop()
         self.db.session.rollback()
-        
+
         assert self.build.steps.count() == 1
         build_step = self.build.steps.first()
         assert build_step.return_code == 0

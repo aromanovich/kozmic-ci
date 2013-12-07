@@ -21,7 +21,7 @@ logger = get_task_logger(__name__)
 
 
 @contextlib.contextmanager
-def create_build_dir():
+def create_temp_dir():
     build_dir = tempfile.mkdtemp()
     yield build_dir
     shutil.rmtree(build_dir)
@@ -156,7 +156,7 @@ def _do_build(hook, build, task_uuid):
                                      port=config['KOZMIC_REDIS_PORT'],
                                      db=config['KOZMIC_REDIS_DATABASE'])
 
-    with create_build_dir() as build_dir:
+    with create_temp_dir() as build_dir:
         channel = task_uuid
 
         try:
