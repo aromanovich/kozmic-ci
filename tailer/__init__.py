@@ -60,7 +60,10 @@ def app(environ, start_response):
     channel_socket_fd = channel.connection._sock.fileno()
 
     while True:
-        rlist, _, _ = gevent.select.select([channel_socket_fd], [], [], 5.0)
+        # Temporary solution: select timeout has to be less than 3 seconds
+        # because uwsgi imposes hard-coded timeout for wating pong:
+        # https://github.com/unbit/uwsgi/blob/master/core/websockets.c#L409
+        rlist, _, _ = gevent.select.select([channel_socket_fd], [], [], 2.0)
         if rlist:
             message = channel.parse_response()
             # See http://redis.io/topics/pubsub for format of `message`
