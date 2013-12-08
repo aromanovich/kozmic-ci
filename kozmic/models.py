@@ -317,7 +317,7 @@ class Build(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, index=True,
                            default=datetime.datetime.utcnow)
     #: Build status, one of the following strings:
-    #: 'success', 'pending', 'failure', 'error'
+    #: 'enqueued', 'success', 'pending', 'failure', 'error'
     status = db.Column(db.String(40), nullable=False)
     #: Project
     project = db.relationship(Project,
