@@ -40,7 +40,7 @@
     <script>
       setTimeout(function () { location.reload(true); }, 3000);
     </script>
-  {% endifr %}
+  {% endif %}
 
   {% for step in build.steps %}
     <h4>{{ step.hook_call.hook.title }} hook</h4>
