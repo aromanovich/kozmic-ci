@@ -14,7 +14,7 @@
     {% block body %}
       <nav class="navbar navbar-inverse" id="topbar" role="navigation">
         <div class="navbar-header">
-          <a class="navbar-brand" href="{{ url_for('core.index') }}">Kozmic CI &alpha;</a>
+          <a class="navbar-brand" href="{{ url_for('projects.index') }}">Kozmic CI &alpha;</a>
         </div>
 
         <div class="navbar-collapse collapse">
@@ -25,9 +25,9 @@
                 &nbsp;{{ current_user.gh_name }} <b class="caret"></b>
               </a>
               <ul class="dropdown-menu">
-                <li><a href="{{ url_for('core.repos') }}">Repositories</a></li>
+                <li><a href="{{ url_for('repos.index') }}">Repositories</a></li>
                 <li class="divider"></li>
-                <li><a href="{{ url_for('users.logout') }}">Sign out</a></li>
+                <li><a href="{{ url_for('auth.logout') }}">Sign out</a></li>
               </ul>
             </li>
           </ul>

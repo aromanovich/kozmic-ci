@@ -2,7 +2,7 @@ from flask import Blueprint
 from flask.ext.login import login_required
 
 
-bp = Blueprint('core', __name__)
+bp = Blueprint('repos', __name__)
 
 
 @bp.before_request

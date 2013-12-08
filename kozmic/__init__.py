@@ -48,17 +48,21 @@ def configure_extensions(app):
 
 
 def configure_blueprints(app):
-    from . import core
-    app.register_blueprint(core.bp)
+    from . import auth
+    app.register_blueprint(auth.bp)
 
-    from . import users
-    app.register_blueprint(users.bp)
+    from . import repos
+    app.register_blueprint(repos.bp, url_prefix='/repositories')
 
     from . import projects
     app.register_blueprint(projects.bp, url_prefix='/projects')
 
     from . import builds
     app.register_blueprint(builds.bp)
+
+    @app.route('/')
+    def index():
+        return flask.redirect(flask.url_for('projects.index'))
 
 
 def init_celery_app(app, celery):

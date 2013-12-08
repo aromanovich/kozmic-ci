@@ -7,7 +7,7 @@ from kozmic.models import User
 from . import bp
 
 
-@bp.route('/auth/auth-callback/')
+@bp.route('/_auth/auth-callback/')
 @bp.github_oauth_app.authorized_handler
 def auth_callback(response):
     access_token = response['access_token']
@@ -22,10 +22,10 @@ def auth_callback(response):
     db.session.add(user)
     db.session.commit()
     login_user(user, remember=True)
-    return redirect(url_for('core.index'))
+    return redirect(url_for('projects.index'))
 
 
-@bp.route('/auth/')
+@bp.route('/_auth/')
 def auth():
     callback_url = url_for('.auth_callback', _external=True)
     return bp.github_oauth_app.authorize(callback=callback_url)
@@ -33,7 +33,7 @@ def auth():
 
 @bp.route('/login/')
 def login():
-    return render_template('users/login.html')
+    return render_template('auth/login.html')
 
 
 @bp.route('/logout/')

@@ -9,7 +9,7 @@ from kozmic import login_manager, principal
 from kozmic.models import User
 
 
-bp = Blueprint('users', __name__)
+bp = Blueprint('auth', __name__)
 
 
 @bp.record
@@ -22,11 +22,11 @@ def configure(state):
 
     @login_manager.unauthorized_handler
     def unauthorized():
-        return redirect(url_for('users.login'))
+        return redirect(url_for('auth.login'))
 
     @app.errorhandler(401)
     def unauthorized_error_handler(error):
-        return redirect(url_for('users.login'))
+        return redirect(url_for('auth.login'))
 
     @principal.identity_loader
     def load_identity():

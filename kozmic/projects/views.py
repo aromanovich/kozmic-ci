@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def index():
     available_projects = current_user.get_available_projects()
     if not available_projects:
-        return redirect(url_for('core.repos'))
+        return redirect(url_for('repos.index'))
     else:
         return redirect(url_for('.show', id=available_projects[0].id))
 

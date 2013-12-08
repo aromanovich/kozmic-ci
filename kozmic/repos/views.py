@@ -32,19 +32,13 @@ github3.github.GitHub.iter_teams = iter_teams
 @bp.route('/')
 @login_required
 def index():
-    return redirect(url_for('projects.index'))
-
-
-@bp.route('/repositories/')
-@login_required
-def repos():
     existing_projects = dict(current_user.projects.with_entities(
         Project.gh_id, Project.id).all())
     return render_template(
-        'core/repos.html', existing_projects=existing_projects)
+        'repos/index.html', existing_projects=existing_projects)
 
 
-@bp.route('/repositories/sync/')
+@bp.route('/sync/')
 @login_required
 def sync():
     """Updates the organizations and repositories to which
@@ -77,10 +71,10 @@ def sync():
     current_user.repos_last_synchronized_at = datetime.datetime.utcnow()
     db.session.commit()
 
-    return redirect(url_for('.repos'))
+    return redirect(url_for('.index'))
 
 
-@bp.route('/repositories/<int:gh_id>/on/', methods=['POST'])
+@bp.route('/<int:gh_id>/on/', methods=['POST'])
 @login_required
 def on(gh_id):
     """Creates :class:`app.models.Project` for GitHub repository
@@ -143,4 +137,4 @@ def on(gh_id):
     else:
         db.session.commit()
 
-    return redirect(url_for('.index'))
+    return redirect(url_for('index'))

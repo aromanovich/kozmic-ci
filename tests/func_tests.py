@@ -20,14 +20,14 @@ class TestUsers(TestCase):
         assert User.query.count() == 0
 
         # Visit home page, follow the redirect, click sign up link
-        r = self.w.get('/').follow().click('Sign up with GitHub')
+        r = self.w.get('/').maybe_follow().click('Sign up with GitHub')
 
         # Make sure that user is being redirected to GitHub and
         # location has right arguments
         assert r.status_code == 302
         location = furl.furl(r.headers['Location'])
         redirect_uri = location.args['redirect_uri']
-        assert redirect_uri == url_for('users.auth_callback')
+        assert redirect_uri == url_for('auth.auth_callback')
         assert location.host == 'github.com'
         assert location.args['scope'] == 'repo'
         # ...now user supposed to go to GitHub and allow access to his repos.
@@ -100,7 +100,7 @@ class TestProjects(TestCase):
         get_gh_repos_stub = unit_tests.TestUser.get_stub_for__get_gh_repos()
         with mock.patch.object(User, 'get_gh_org_repos', get_gh_org_repos_stub):
             with mock.patch.object(User, 'get_gh_repos', get_gh_repos_stub):
-                r = self.w.get(url_for('core.sync'))
+                r = self.w.get(url_for('repos.sync'))
 
         # Make sure that database reflects data provided by the stubs
         assert user.repositories.count() == 3

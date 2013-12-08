@@ -58,7 +58,7 @@
           <ul class="list-group">
             {% for repo in current_user.repositories %}
               {% with repo_type='org-repo' %}
-                {% include 'core/_repo.html' %}
+                {% include 'repos/_repo.html' %}
               {% endwith %}
             {% endfor %}
           </ul>
@@ -70,7 +70,7 @@
             <ul class="list-group">
               {% for repo in org.repositories %}
                 {% with repo_type='org-repo' %}
-                  {% include 'core/_repo.html' %}
+                  {% include 'repos/_repo.html' %}
                 {% endwith %}
               {% endfor %}
             </ul>
