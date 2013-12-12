@@ -58,19 +58,23 @@ def app(environ, start_response):
     channel = r.pubsub()
     channel.subscribe(task_uuid)
     channel_socket_fd = channel.connection._sock.fileno()
+    websocket_fd = uwsgi.connection_fd()
 
     while True:
-        # Temporary solution: select timeout has to be less than 3 seconds
-        # because uwsgi imposes hard-coded timeout for wating pong:
-        # https://github.com/unbit/uwsgi/blob/master/core/websockets.c#L409
-        rlist, _, _ = gevent.select.select([channel_socket_fd], [], [], 2.0)
+        rlist, _, _ = gevent.select.select(
+            [channel_socket_fd, websocket_fd], [], [], 5.0)
         if rlist:
-            message = channel.parse_response()
-            # See http://redis.io/topics/pubsub for format of `message`
-            if message[0] == 'message':
-                send_message('message', message[2])
+            for fd in rlist:
+                if fd == channel_socket_fd:
+                    message = channel.parse_response()
+                    # See http://redis.io/topics/pubsub for format of `message`
+                    if message[0] == 'message':
+                        send_message('message', message[2])
+                elif fd == websocket_fd:
+                    # Let uwsgi do it's job to receive pong and send ping
+                    uwsgi.websocket_recv_nb()
         else:
-            # Have not heard from channel in 5 seconds...
+            # Have not heard from channel and client in 5 seconds...
             try:
                 # Check if the client is still here by sending ping
                 # (`websocket_recv` sends ping implicitly,
