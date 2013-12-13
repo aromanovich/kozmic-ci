@@ -20,6 +20,8 @@ using the following command string::
     TAILER_REDIS_PORT=6379 \\
     TAILER_REDIS_DATABASE=0 \\
     uwsgi --http-socket :9090 --gevent 100 --module tailer:app --gevent-monkey-patch
+
+Do not use ``--http :9090``, because it breaks websockets ping/pong.
 """
 import os
 import re
