@@ -389,7 +389,7 @@ class BuildStep(db.Model):
         **Must** be called at build step start time.
         """
         self.started_at = datetime.datetime.utcnow()
-        description = 'Kozmic build #{0} is pending.'.format(self.build.id)
+        description = 'Kozmic build #{0} is pending.'.format(self.build.number)
         self.build.set_status('pending', description=description)
 
     def finished(self, return_code):
@@ -403,7 +403,7 @@ class BuildStep(db.Model):
             description = (
                 'Kozmic build #{0} has failed '
                 'because of the "{1}" hook.'.format(
-                    self.build.id,
+                    self.build.number,
                     self.hook_call.hook.title))
             self.build.set_status('failure', description=description)
             return
@@ -414,6 +414,6 @@ class BuildStep(db.Model):
         all_other_steps_succeeded = all(step.return_code == 0 for step in steps
                                         if step.id != self.id)
         if all_other_steps_finished and all_other_steps_succeeded:
-            description = 'Kozmic build #{0} has passed.'.format(self.build.id)
+            description = 'Kozmic build #{0} has passed.'.format(self.build.number)
             self.build.set_status('success', description=description)
             return
