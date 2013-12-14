@@ -79,7 +79,7 @@ cd ./src && git checkout -q {sha}
 
 # Disable stdout buffering and redirect it to the file
 # being tailed to the redis pubsub channel
-stdbuf -o0 bash -c "../build-script.sh" 2>&1 > ../build.log
+stdbuf -o0 bash -c "../build-script.sh" &> ../build.log
 '''.strip()
 
 ASKPASS_SH = '''
