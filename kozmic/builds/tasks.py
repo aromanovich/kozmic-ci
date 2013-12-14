@@ -79,7 +79,7 @@ cd ./src && git checkout -q {sha}
 
 # Disable stdout buffering and redirect it to the file
 # being tailed to the redis pubsub channel
-stdbuf -o0 bash ../build-script.sh > ../build.log
+stdbuf -o0 bash ../build-script.sh 2>&1 > ../build.log
 '''.strip()
 
 ASKPASS_SH = '''
@@ -183,7 +183,7 @@ def _do_build(hook, build, task_uuid):
                 build_dir=build_dir)
             builder.start()
             builder.join()
-            
+
             stdout = ''
             if os.path.exists(log_path):
                 with open(log_path, 'r') as log:
