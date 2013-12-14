@@ -6,7 +6,9 @@ from flask.ext import wtf
 class HookForm(wtf.Form):
     title = wtforms.TextField('Title', [wtforms.validators.Required()])
     build_script = wtforms.TextAreaField(
-        'Build bash script', [wtforms.validators.Required()])
+        'Build script', [wtforms.validators.Required()],
+        description='It will be run as an executable, so do not forget put '
+                    'a shebang directive at the beginning.')
     docker_image = wtforms.TextField(
         'Docker image', [wtforms.validators.Required()],
         description='The name of a Docker container image that will be used '

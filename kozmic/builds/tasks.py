@@ -79,7 +79,7 @@ cd ./src && git checkout -q {sha}
 
 # Disable stdout buffering and redirect it to the file
 # being tailed to the redis pubsub channel
-stdbuf -o0 bash ../build-script.sh 2>&1 > ../build.log
+stdbuf -o0 bash -c "../build-script.sh" 2>&1 > ../build.log
 '''.strip()
 
 ASKPASS_SH = '''
@@ -134,6 +134,7 @@ class Builder(threading.Thread):
         build_script_path = build_dir_path('build-script.sh')
         with open(build_script_path, 'w') as build_script:
             build_script.write(self._shell_code)
+        os.chmod(build_script_path, 755)
 
         client = docker.Client()
 
