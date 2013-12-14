@@ -8,4 +8,4 @@ if [[ -z $KOZMIC_CONFIG ]]; then
     KOZMIC_CONFIG=kozmic.config_local.TestingConfig
 fi
 
-PYTHONPATH=.:$PYTHONPATH KOZMIC_CONFIG=$KOZMIC_CONFIG py.test "$@"
+PYTHONPATH=.:$PYTHONPATH KOZMIC_CONFIG=$KOZMIC_CONFIG py.test ./tests "$@"

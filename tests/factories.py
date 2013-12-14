@@ -8,7 +8,7 @@ from kozmic.models import (db, User, Project, Hook, HookCall,
 
 
 class Factory(factory.alchemy.SQLAlchemyModelFactory):
-    FACTORY_SESSION = None #db.session
+    FACTORY_SESSION = None
     ABSTRACT_FACTORY = True
     
     @classmethod
@@ -92,8 +92,9 @@ class BuildFactory(Factory):
     FACTORY_FOR = Build
 
     id = factory.Sequence(lambda n: n)
-    gh_commit_author= 'aromanovich'
+    gh_commit_author = 'aromanovich'
     gh_commit_message = 'ok'
+    gh_commit_ref = 'master'
     status = 'enqueued'
     
     @factory.lazy_attribute

@@ -1,14 +1,15 @@
 # coding: utf-8
+import copy
+
 import furl
 import mock
 import httpretty
-
 import github3.repos
 import github3.git
 from flask import url_for
 
 import kozmic.builds.tasks
-from kozmic.models import User, Project, Hook, Build, BuildStep
+from kozmic.models import User, Project, Hook, HookCall, Build, BuildStep
 from . import TestCase, func_fixtures as fixtures
 from . import factories, unit_tests
 
@@ -214,7 +215,7 @@ class TestHooksManagement(TestCase):
                 'url': url_for('builds.hook', id=hook.id, _external=True),
                 'content_type': 'json',
             },
-            'events': ['pull_request'],
+            'events': ['push', 'pull_request'],
             'name': 'web',
         }
 
@@ -382,22 +383,26 @@ class TestGitHubHook(TestCase):
         self.project = factories.ProjectFactory.create(owner=self.user)
         self.hook = factories.HookFactory.create(project=self.project)
 
-    def test_github_hook(self):
-        commit_data = fixtures.COMMIT_47fe2_DATA
-        
+    def _create_gh_repo_mock(self, commit_data):
         gh_repo_mock = mock.Mock()
         gh_repo_mock.git_commit.return_value = github3.git.Commit(commit_data)
-        head_sha = '47fe2c74f6d46304830ed46afd59a53401b20b78'
-        assert (head_sha == commit_data['sha'] ==
-                fixtures.HOOK_CALL_DATA['pull_request']['head']['sha'])
+        assert (fixtures.PULL_REQUEST_HOOK_CALL_DATA['pull_request']['head']['sha'] ==
+                commit_data['sha'])
+        return gh_repo_mock
+
+    def test_github_pull_request_hook(self):
+        commit_data = fixtures.COMMIT_47fe2_DATA
+        gh_repo_mock = self._create_gh_repo_mock(commit_data)
+        head_sha = commit_data['sha']
 
         with mock.patch.object(Project, 'gh', gh_repo_mock):
             with mock.patch('kozmic.builds.tasks.do_build') as do_build_mock:
                 r = self.w.post_json(
                     url_for('builds.hook', id=self.hook.id, _external=True),
-                    fixtures.HOOK_CALL_DATA)
+                    fixtures.PULL_REQUEST_HOOK_CALL_DATA)
 
         assert r.status_code == 200
+        assert r.body == 'Thanks'
 
         gh_repo_mock.git_commit.assert_called_once_with(head_sha)
 
@@ -407,10 +412,42 @@ class TestGitHubHook(TestCase):
         hook_call = self.hook.calls.first()
 
         build = self.project.builds.first()
+        assert self.project.builds.count() == 1
         assert build.status == 'enqueued'
+        assert build.number == 1
+        assert build.gh_commit_ref == 'test'
         assert build.gh_commit_sha == head_sha
         assert build.gh_commit_message == commit_data['message']
         assert build.gh_commit_author == commit_data['author']['name']
 
+        do_build_mock.delay.assert_called_once_with(
+            build_id=build.id, hook_call_id=hook_call.id)
+
+    def test_consecutive_hook_calls(self):
+        commit_data = fixtures.COMMIT_47fe2_DATA
+        gh_repo_mock = self._create_gh_repo_mock(commit_data)
+        head_sha = commit_data['sha']
+
+        with mock.patch.object(Project, 'gh', gh_repo_mock):
+            push_hook_call_data = copy.deepcopy(fixtures.PUSH_HOOK_CALL_DATA)
+            push_hook_call_data['ref'] = 'refs/heads/{}'.format(
+                fixtures.PULL_REQUEST_HOOK_CALL_DATA['pull_request']['head']['ref'])
+
+            with mock.patch('kozmic.builds.tasks.do_build') as do_build_mock:
+                r = self.w.post_json(
+                    url_for('builds.hook', id=self.hook.id, _external=True),
+                    push_hook_call_data)
+                r = self.w.post_json(
+                    url_for('builds.hook', id=self.hook.id, _external=True),
+                    fixtures.PULL_REQUEST_HOOK_CALL_DATA)
+
+        build = self.project.builds.first()
+        hook_call = self.hook.calls.first()
+
+        assert self.project.builds.count() == 1
+        assert self.hook.calls.count() == 1
+        assert build.number == 1  # Make sure that second hook call hasn't
+                                  # increased build number
+        # And `do_build` was called only once
         do_build_mock.delay.assert_called_once_with(
             build_id=build.id, hook_call_id=hook_call.id)

@@ -15,8 +15,9 @@ from flask.ext.principal import Need
 from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
+import kozmic.builds.views
 from kozmic.models import db, User, Project, Build
-from . import TestCase, factories, unit_fixtures as fixtures
+from . import TestCase, factories, unit_fixtures as fixtures, func_fixtures
 
 
 class TestUser(unittest.TestCase):
@@ -130,6 +131,13 @@ class TestUserDB(TestCase):
 
 
 class TestBuildDB(TestCase):
+    def test_get_ref_and_sha(self):
+        get_ref_and_sha = kozmic.builds.views.get_ref_and_sha
+        assert (get_ref_and_sha(func_fixtures.PULL_REQUEST_HOOK_CALL_DATA) ==
+                (u'test', u'47fe2c74f6d46304830ed46afd59a53401b20b78'))
+        assert (get_ref_and_sha(func_fixtures.PUSH_HOOK_CALL_DATA) ==
+                (u'master', u'47fe2c74f6d46304830ed46afd59a53401b20b78'))
+
     def test_calculate_number(self):
         user = factories.UserFactory.create()
         project = factories.ProjectFactory.create(owner=user)
@@ -139,6 +147,7 @@ class TestBuildDB(TestCase):
             gh_commit_sha='a' * 40,
             gh_commit_author='aromanovich',
             gh_commit_message='ok',
+            gh_commit_ref='master',
             status='enqueued')
         build_1.calculate_number()
         db.session.add(build_1)
@@ -149,6 +158,7 @@ class TestBuildDB(TestCase):
             gh_commit_sha='b' * 40,
             gh_commit_author='aromanovich',
             gh_commit_message='ok',
+            gh_commit_ref='master',
             status='enqueued')
         build_2.calculate_number()
         db.session.add(build_2)

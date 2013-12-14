@@ -301,14 +301,21 @@ class HookCall(db.Model):
 
 class Build(db.Model):
     """Reflects a project commit that triggered a project hook."""
+    __table_args__ = (
+        db.UniqueConstraint('project_id', 'gh_commit_ref', 'gh_commit_sha',
+                            name='unique_ref_and_sha_within_project'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'),
                            nullable=False)
 
     #: Build number (within a project)
     number = db.Column(db.Integer, nullable=False, index=True)
+    #: Commit reference (branch on which the commit was pushed)
+    gh_commit_ref = db.Column(db.String(200), nullable=False)
     #: Commit SHA
-    gh_commit_sha = db.Column(db.String(40), nullable=False, unique=True)
+    gh_commit_sha = db.Column(db.String(40), nullable=False)
     #: Commit author
     gh_commit_author = db.Column(db.String(200), nullable=False)
     #: Commit message

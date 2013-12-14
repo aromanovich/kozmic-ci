@@ -1,6 +1,81 @@
 import json
 
 
+PUSH_HOOK_CALL_DATA = {
+ u'after': u'56cc68f8c5f8774f4fd5a3cce075daa858b6ac6e',
+ u'before': u'ff3a2c7478281db00c7f98156b33df7d3aa80a2a',
+ u'commits': [{u'added': [],
+               u'author': {u'email': u'anthony.romanovich@gmail.com',
+                           u'name': u'Anton Romanovich',
+                           u'username': u'aromanovich'},
+               u'committer': {u'email': u'anthony.romanovich@gmail.com',
+                              u'name': u'Anton Romanovich',
+                              u'username': u'aromanovich'},
+               u'distinct': True,
+               u'id': u'6a55b64b3c3b94ffb4291a220e06ce7be9f3f2d2',
+               u'message': u'Commit1',
+               u'modified': [u'x'],
+               u'removed': [],
+               u'timestamp': u'2013-12-13T21:38:43-08:00',
+               u'url': u'https://github.com/aromanovich/yearinpictures/commit/6a55b64b3c3b94ffb4291a220e06ce7be9f3f2d2'},
+              {u'added': [],
+               u'author': {u'email': u'anthony.romanovich@gmail.com',
+                           u'name': u'Anton Romanovich',
+                           u'username': u'aromanovich'},
+               u'committer': {u'email': u'anthony.romanovich@gmail.com',
+                              u'name': u'Anton Romanovich',
+                              u'username': u'aromanovich'},
+               u'distinct': True,
+               u'id': u'47fe2c74f6d46304830ed46afd59a53401b20b78',
+               u'message': u'Commit2',
+               u'modified': [u'y'],
+               u'removed': [],
+               u'timestamp': u'2013-12-13T21:38:48-08:00',
+               u'url': u'https://github.com/aromanovich/yearinpictures/commit/56cc68f8c5f8774f4fd5a3cce075daa858b6ac6e'}],
+ u'compare': u'https://github.com/aromanovich/yearinpictures/compare/ff3a2c747828...56cc68f8c5f8',
+ u'created': False,
+ u'deleted': False,
+ u'forced': False,
+ u'head_commit': {u'added': [],
+                  u'author': {u'email': u'anthony.romanovich@gmail.com',
+                              u'name': u'Anton Romanovich',
+                              u'username': u'aromanovich'},
+                  u'committer': {u'email': u'anthony.romanovich@gmail.com',
+                                 u'name': u'Anton Romanovich',
+                                 u'username': u'aromanovich'},
+                  u'distinct': True,
+                  u'id': u'47fe2c74f6d46304830ed46afd59a53401b20b78',
+                  u'message': u'Commit2',
+                  u'modified': [u'y'],
+                  u'removed': [],
+                  u'timestamp': u'2013-12-13T21:38:48-08:00',
+                  u'url': u'https://github.com/aromanovich/yearinpictures/commit/47fe2c74f6d46304830ed46afd59a53401b20b78'},
+ u'pusher': {u'email': u'anthony.romanovich@gmail.com',
+             u'name': u'aromanovich'},
+ u'ref': u'refs/heads/master',
+ u'repository': {u'created_at': 1348397294,
+                 u'fork': False,
+                 u'forks': 0,
+                 u'has_downloads': True,
+                 u'has_issues': True,
+                 u'has_wiki': True,
+                 u'id': 5921305,
+                 u'language': u'JavaScript',
+                 u'master_branch': u'master',
+                 u'name': u'yearinpictures',
+                 u'open_issues': 1,
+                 u'owner': {u'email': u'anthony.romanovich@gmail.com',
+                            u'name': u'aromanovich'},
+                 u'private': True,
+                 u'pushed_at': 1386999536,
+                 u'size': 1892,
+                 u'stargazers': 0,
+                 u'url': u'https://github.com/aromanovich/yearinpictures',
+                 u'watchers': 0}}
+
+PUSH_HOOK_CALL_JSON = json.dumps(PUSH_HOOK_CALL_DATA)
+
+
 USER_DATA = {
     u'avatar_url': u'https://2.gravatar.com/avatar/e85b7ebc8dacdaa850d3999f7c676343?d=https%3A%2F%2Fidenticons.github.com%2F117220178921ce5a8073addc64382fd3.png&r=x',
     u'bio': None,
@@ -67,6 +142,7 @@ HOOK_DATA = {
     },
 }
 
+
 COMMIT_47fe2_DATA = {
     u'author': {
         u'date': u'2013-11-12T18:31:07Z',
@@ -94,7 +170,7 @@ COMMIT_47fe2_DATA = {
 }
  
 
-HOOK_CALL_DATA = {
+PULL_REQUEST_HOOK_CALL_DATA = {
  u'action': u'synchronize',
  u'number': 6,
  u'pull_request': {u'_links': {u'comments': {u'href': u'https://api.github.com/repos/aromanovich/yearinpictures/issues/6/comments'},
@@ -459,4 +535,4 @@ HOOK_CALL_DATA = {
              u'type': u'User',
              u'url': u'https://api.github.com/users/aromanovich'}}
 
-HOOK_CALL_JSON = json.dumps(HOOK_CALL_DATA)
+PULL_REQUEST_HOOK_CALL_JSON = json.dumps(PULL_REQUEST_HOOK_CALL_DATA)

@@ -44,7 +44,7 @@ def history(id):
 @bp.route('/<int:project_id>/builds/<id_or_latest>/')
 def build(project_id, id_or_latest):
     project = Project.query.get_or_404(project_id)
-    
+
     if id_or_latest == 'latest':
         build = project.latest_build
         if not build:
@@ -88,10 +88,10 @@ def add_hook(project_id):
         hook = Hook(project=project)
         form.populate_obj(hook)
         db.session.add(hook)
-        
+
         hook.gh_id = -1  # Just some integer to avoid integrity error
         db.session.flush()  # Flush SQL to get `hook.id`
-        
+
         try:
             gh_hook = project.gh.create_hook(
                 name='web',
@@ -99,7 +99,7 @@ def add_hook(project_id):
                     'url': url_for('builds.hook', id=hook.id, _external=True),
                     'content_type': 'json',
                 },
-                events=['pull_request'],
+                events=['push', 'pull_request'],
                 active=True)
         except github3.GitHubError as exc:
             logger.warning(
