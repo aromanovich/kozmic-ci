@@ -15,6 +15,7 @@ Flask-Principal==0.4.0
 Flask-Migrate==0.1.4
 Flask-OAuth==0.12
 Flask-Assets==0.8
+Flask-Mail==0.9.0
 
 pytailf==1.1
 pycrypto==2.6.1

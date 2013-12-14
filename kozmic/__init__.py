@@ -11,6 +11,7 @@ from flask.ext.login import LoginManager
 from flask.ext.principal import Principal
 from flask.ext.assets import Environment, Bundle
 from flask.ext.wtf.csrf import CsrfProtect
+from flask.ext.mail import Mail
 
 
 db = SQLAlchemy()
@@ -19,6 +20,7 @@ login_manager = LoginManager()
 principal = Principal()
 celery = Celery()
 csrf = CsrfProtect()
+mail = Mail()
 
 
 def create_app(config=None):
@@ -40,6 +42,7 @@ def configure_extensions(app):
     principal.init_app(app)
     init_celery_app(app, celery)
     csrf.init_app(app)
+    mail.init_app(app)
     assets = Environment(app)
     css = Bundle('css/bootstrap.css', output='gen/style.css')
     js = Bundle('js/bootstrap.js', output='gen/common.js')

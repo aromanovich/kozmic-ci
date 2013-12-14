@@ -12,10 +12,11 @@ import sqlalchemy.dialects.mysql
 import flask
 from flask.ext.login import UserMixin
 from flask.ext.principal import Identity, RoleNeed, UserNeed
+from flask.ext.mail import Message
 from werkzeug.utils import cached_property
 from sqlalchemy.ext.declarative import declared_attr
 
-from kozmic import db, perms
+from kozmic import db, mail, perms
 
 
 class RepositoryBase(object):
@@ -356,11 +357,41 @@ class Build(db.Model):
 
     def set_status(self, status, target_url='', description=''):
         """Sets :attr:`status` and posts it on GitHub."""
-        assert status in ('success', 'pending', 'failure', 'error')
-        rv = self.project.gh.create_status(
-            self.gh_commit_sha, status,
-            target_url=target_url or self.url, description=description)
+        assert status in ('enqueued', 'success', 'pending', 'failure', 'error')
+
+        if self.status == status:
+            return
         self.status = status
+
+        if self.status != 'enqueued':
+            self.project.gh.create_status(
+                self.gh_commit_sha,
+                status,
+                target_url=target_url or self.url,
+                description=description)
+
+        if self.status in ('failure', 'error'):
+            header_template = u'[{status}] {project}#{build_number} ({ref} — {sha})'
+            html_template = '<p><a href="{url}">{description}</a></p>'
+
+            header = header_template.format(
+                status=self.status,
+                project=self.project.gh_full_name,
+                build_number=self.number,
+                sha=self.gh_commit_sha[:8],
+                ref=self.gh_commit_ref)
+            html = html_template.format(
+                url=target_url or self.url,
+                description=description or 'The build has failed.')
+            members = [self.project.owner] + self.project.members.all()
+            recipients = [member.email for member in members if member.email]
+
+            if recipients:
+                message = Message(
+                    header,
+                    html=html,
+                    recipients=recipients)
+                mail.send(message)
 
     @property
     def url(self):

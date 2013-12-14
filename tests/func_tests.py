@@ -72,6 +72,7 @@ class TestUsers(TestCase):
         assert User.query.count() == 1
         user = User.query.first()
         assert user.gh_access_token == access_token
+        assert user.email == fixtures.USER_DATA['email']
         assert user.gh_name == fixtures.USER_DATA['name']
         assert user.gh_id == fixtures.USER_DATA['id']
         assert user.gh_login == fixtures.USER_DATA['login']
@@ -456,7 +457,7 @@ class TestGitHubHooks(TestCase):
 class TestBadges(TestCase):
     def setup_method(self, method):
         TestCase.setup_method(self, method)
-        
+
         self.user = factories.UserFactory.create()
         self.project = factories.ProjectFactory.create(
             owner=self.user,
@@ -465,12 +466,12 @@ class TestBadges(TestCase):
 
     def test_basics(self):
         r = self.w.get('/badges/aromanovich/flask-webtest/master')
-        assert r.status_code == 302
+        assert r.status_code == 307
         assert r.location == 'https://kozmic.test/static/img/badges/success.png'
-        
+
         self.build = factories.BuildFactory.create(
             project=self.project,
             status='failure')
         r = self.w.get('/badges/aromanovich/flask-webtest/master')
-        assert r.status_code == 302
+        assert r.status_code == 307
         assert r.location == 'https://kozmic.test/static/img/badges/failure.png'

@@ -28,6 +28,7 @@ class DefaultConfig(object):
     CELERY_DEFAULT_QUEUE = 'kozmic'
     SERVER_NAME = None
     TAILER_URL_TEMPLATE = None
+    MAIL_DEFAULT_SENDER = None  # _must_ be configured
 
 
 class DevelopmentConfig(DefaultConfig):
@@ -45,3 +46,5 @@ class TestingConfig(DefaultConfig):
     # otherwise Flask-Login will turn off `login_required`
     # decorator because of TESTING variable:
     LOGIN_DISABLED = False
+    MAIL_SUPPRESS_SEND = True
+    MAIL_DEFAULT_SENDER = 'no-reply@kozmic.test'

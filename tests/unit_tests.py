@@ -16,6 +16,7 @@ from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
 import kozmic.builds.views
+from kozmic import mail
 from kozmic.models import db, User, Project, Build
 from . import TestCase, factories, unit_fixtures as fixtures, func_fixtures
 
@@ -131,6 +132,12 @@ class TestUserDB(TestCase):
 
 
 class TestBuildDB(TestCase):
+    def setup_method(self, method):
+        TestCase.setup_method(self, method)
+
+        self.user = factories.UserFactory.create()
+        self.project = factories.ProjectFactory.create(owner=self.user)
+
     def test_get_ref_and_sha(self):
         get_ref_and_sha = kozmic.builds.views.get_ref_and_sha
         assert (get_ref_and_sha(func_fixtures.PULL_REQUEST_HOOK_CALL_DATA) ==
@@ -138,12 +145,60 @@ class TestBuildDB(TestCase):
         assert (get_ref_and_sha(func_fixtures.PUSH_HOOK_CALL_DATA) ==
                 (u'master', u'47fe2c74f6d46304830ed46afd59a53401b20b78'))
 
-    def test_calculate_number(self):
-        user = factories.UserFactory.create()
-        project = factories.ProjectFactory.create(owner=user)
+    def test_set_status(self):
+        description = 'Something went very wrong'
 
+        # 1. There are no members with email addresses
+        build_1 = factories.BuildFactory.create(project=self.project)
+
+        with mail.record_messages() as outbox:
+            with mock.patch.object(Project, 'gh') as gh_repo_mock:
+                build_1.set_status('failure', description=description)
+
+        assert not outbox
+        gh_repo_mock.create_status.assert_called_once_with(
+            build_1.gh_commit_sha,
+            'failure',
+            target_url=build_1.url,
+            description=description)
+
+        # 2. There are members with email addresses
+        member_1 = factories.UserFactory.create(email='john@doe.com')
+        member_2 = factories.UserFactory.create(email='jane@doe.com')
+        self.project.members.extend([member_1, member_2])
+        db.session.commit()
+
+        build_2 = factories.BuildFactory.create(project=self.project)
+
+        with mail.record_messages() as outbox:
+            with mock.patch.object(Project, 'gh') as gh_repo_mock:
+                build_2.set_status('failure', description=description)
+
+        assert len(outbox) == 1
+        message = outbox[0]
+        assert self.project.gh_full_name in message.subject
+        assert 'failure' in message.subject
+        assert build_2.gh_commit_ref in message.subject
+        assert build_2.url in message.html
+
+        gh_repo_mock.create_status.assert_called_once_with(
+            build_2.gh_commit_sha,
+            'failure',
+            target_url=build_2.url,
+            description=description)
+
+        # 3. Repeat the same `set_status` call and make sure that we
+        # will not be notified the second time
+        with mail.record_messages() as outbox:
+            with mock.patch.object(Project, 'gh') as gh_repo_mock:
+                build_2.set_status('failure', description=description)
+
+        assert not outbox
+        assert not gh_repo_mock.create_status.called
+
+    def test_calculate_number(self):
         build_1 = Build(
-            project=project,
+            project=self.project,
             gh_commit_sha='a' * 40,
             gh_commit_author='aromanovich',
             gh_commit_message='ok',
@@ -154,7 +209,7 @@ class TestBuildDB(TestCase):
         db.session.commit()
 
         build_2 = Build(
-            project=project,
+            project=self.project,
             gh_commit_sha='b' * 40,
             gh_commit_author='aromanovich',
             gh_commit_message='ok',
