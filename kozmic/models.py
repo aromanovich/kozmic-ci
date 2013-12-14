@@ -101,6 +101,8 @@ class User(HasRepositories, db.Model, UserMixin):
     #: The last time when the user's repositories and organizations
     #: were synced with GitHub
     repos_last_synchronized_at = db.Column(db.DateTime)
+    #: E-mail address
+    email = db.Column(db.String(1000))
 
     def __repr__(self):
         return u'<User #{0.id} gh_id={0.gh_id} gh_login={0.gh_login}>'.format(self)

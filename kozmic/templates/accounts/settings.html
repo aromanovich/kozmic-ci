@@ -1,0 +1,9 @@
+{% extends '_base.html' %}
+
+{% from '_utils.html' import quick_form %}
+
+{% block container %}
+  <h3>Account settings</h3>
+  {% include '_messages.html' %}
+  {{ quick_form(form) }}
+{% endblock %}

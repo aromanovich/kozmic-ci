@@ -54,6 +54,9 @@ def configure_blueprints(app):
     from . import repos
     app.register_blueprint(repos.bp, url_prefix='/repositories')
 
+    from . import accounts
+    app.register_blueprint(accounts.bp, url_prefix='/account')
+
     from . import projects
     app.register_blueprint(projects.bp, url_prefix='/projects')
 

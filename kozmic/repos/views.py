@@ -3,14 +3,14 @@ import datetime
 import github3
 from Crypto.PublicKey import RSA
 from flask import current_app, request, render_template, redirect, url_for, abort
-from flask.ext.login import current_user, login_required
+from flask.ext.login import current_user
 
 from kozmic import db
 from kozmic.models import User, Organization, Project
 from . import bp
 
 
-# TODO Make a pull request!
+# TODO Make a pull request
 # Monkeypatch GitHub library
 def iter_teams(self, type=None, sort=None, direction=None,
                number=-1, etag=None):
@@ -30,7 +30,6 @@ github3.github.GitHub.iter_teams = iter_teams
 
 
 @bp.route('/')
-@login_required
 def index():
     existing_projects = dict(current_user.projects.with_entities(
         Project.gh_id, Project.id).all())
@@ -39,7 +38,6 @@ def index():
 
 
 @bp.route('/sync/')
-@login_required
 def sync():
     """Updates the organizations and repositories to which
     the user has admin access.
@@ -75,7 +73,6 @@ def sync():
 
 
 @bp.route('/<int:gh_id>/on/', methods=['POST'])
-@login_required
 def on(gh_id):
     """Creates :class:`app.models.Project` for GitHub repository
     with `gh_id`.

@@ -43,15 +43,7 @@
         {% endfor %}
       </ul>
       
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          <p>
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-          </p>
-        {% endif %}
-      {% endwith %}
+      {% include '_messages.html' %}
 
       {% block content %}
       {% endblock %}
