@@ -375,7 +375,7 @@ class TestMembersManagement(TestCase):
         assert self.ramm not in self.project.members
 
 
-class TestGitHubHook(TestCase):
+class TestGitHubHooks(TestCase):
     def setup_method(self, method):
         TestCase.setup_method(self, method)
 
@@ -451,3 +451,26 @@ class TestGitHubHook(TestCase):
         # And `do_build` was called only once
         do_build_mock.delay.assert_called_once_with(
             build_id=build.id, hook_call_id=hook_call.id)
+
+
+class TestBadges(TestCase):
+    def setup_method(self, method):
+        TestCase.setup_method(self, method)
+        
+        self.user = factories.UserFactory.create()
+        self.project = factories.ProjectFactory.create(
+            owner=self.user,
+            gh_login='aromanovich',
+            gh_name='flask-webtest')
+
+    def test_basics(self):
+        r = self.w.get('/badges/aromanovich/flask-webtest/master')
+        assert r.status_code == 302
+        assert r.location == 'https://kozmic.test/static/img/badges/success.png'
+        
+        self.build = factories.BuildFactory.create(
+            project=self.project,
+            status='failure')
+        r = self.w.get('/badges/aromanovich/flask-webtest/master')
+        assert r.status_code == 302
+        assert r.location == 'https://kozmic.test/static/img/badges/failure.png'

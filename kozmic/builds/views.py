@@ -1,10 +1,10 @@
 import json
 
 import github3
-from flask import request
+from flask import request, redirect, url_for
 
 from kozmic import db, csrf
-from kozmic.models import Build, Hook, HookCall
+from kozmic.models import Project, Build, Hook, HookCall
 from . import bp, tasks
 
 
@@ -63,3 +63,17 @@ def hook(id):
         tasks.do_build.delay(build_id=build.id, hook_call_id=hook_call.id)
 
     return 'Thanks'
+
+
+@bp.route('/badges/<gh_login>/<gh_name>/<ref>')
+def badge(gh_login, gh_name, ref):
+    project = Project.query.filter_by(
+        gh_login=gh_login, gh_name=gh_name).first_or_404()
+    build = project.builds.order_by(Build.number.desc()).first()
+    badge = build and build.status or 'success'
+    return redirect(url_for(
+        'static',
+        filename='img/badges/{}.png'.format(badge),
+        _external=True,
+        # Use https so that GitHub does not cache images served from HTTPS
+        _scheme='https' ))
