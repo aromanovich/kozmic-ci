@@ -71,9 +71,11 @@ def badge(gh_login, gh_name, ref):
         gh_login=gh_login, gh_name=gh_name).first_or_404()
     build = project.builds.order_by(Build.number.desc()).first()
     badge = build and build.status or 'success'
-    return redirect(url_for(
+    response = redirect(url_for(
         'static',
         filename='img/badges/{}.png'.format(badge),
         _external=True,
         # Use https so that GitHub does not cache images served from HTTPS
         _scheme='https' ))
+    response.status_code = 307
+    return response
