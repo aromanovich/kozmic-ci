@@ -1,14 +1,14 @@
 {% extends 'projects/_base.html' %}
 
-{% if id_or_latest == 'latest' %}
+{% if id == 'latest' %}
   {% set active_tab = 'latest-build' %}
 {% else %}
   {% set active_tab = 'build' %}
   {% set extra_tabs = [
     (
-      url_for('.build', project_id=project.id, id_or_latest=id_or_latest),
+      url_for('.build', project_id=project.id, id=id),
       'build',
-      'Build #{}'.format(id_or_latest)
+      'Build #{}'.format(id)
     ),
   ] -%}
 {% endif %}

@@ -27,7 +27,7 @@
         <td>{{ build.finished_at }}</td>
         <td>{{ build.gh_commit_sha }}</td>
         <td>
-          <a href="{{ url_for('.build', project_id=project.id, id_or_latest=build.id) }}" class="btn btn-default">
+          <a href="{{ url_for('.build', project_id=project.id, id=build.id) }}" class="btn btn-default">
             Show
           </a>
         </td>

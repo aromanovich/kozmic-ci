@@ -398,7 +398,7 @@ class Build(db.Model):
     @property
     def url(self):
         return flask.url_for(
-            'projects.build', project_id=self.project.id, id_or_latest=self.id)
+            'projects.build', project_id=self.project.id, id=self.id)
 
 
 class BuildStep(db.Model):

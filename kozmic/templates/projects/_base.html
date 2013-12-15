@@ -21,7 +21,7 @@
 
     <div class="col-md-9">
       {% set tabs = [
-          (url_for('.build', project_id=project.id, id_or_latest='latest'),
+          (url_for('.build', project_id=project.id, id='latest'),
                    'latest-build', 'Latest build'),
           (url_for('.history', id=project.id), 'build-history', 'Build history'),
           (url_for('.settings', id=project.id), 'settings', 'Settings'),

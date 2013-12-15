@@ -26,7 +26,7 @@ def index():
 @bp.route('/<int:id>/')
 def show(id):
     project = Project.query.get_or_404(id)
-    return redirect(url_for('.build', project_id=id, id_or_latest='latest'))
+    return redirect(url_for('.build', project_id=id, id='latest'))
 
 
 @bp.route('/<int:id>/history/')
@@ -41,24 +41,24 @@ def history(id):
         builds=builds)
 
 
-@bp.route('/<int:project_id>/builds/<id_or_latest>/')
-def build(project_id, id_or_latest):
+@bp.route('/<int:project_id>/builds/<id>/')
+def build(project_id, id):
     project = Project.query.get_or_404(project_id)
 
-    if id_or_latest == 'latest':
-        build = project.get_latest_build()
+    if id == 'latest':
+        build = project.get_latest_build(ref=request.args.get('ref'))
         if not build:
             return redirect(url_for('.settings', id=project_id))
     else:
         try:
-            build_id = int(id_or_latest)
+            build_id = int(id)
         except ValueError:
             abort(404)
         build = project.builds.filter_by(id=build_id).first_or_404()
 
     return render_template(
         'projects/build.html',
-        id_or_latest=id_or_latest,
+        id=id,
         project=project,
         tailer_url_template=current_app.config['TAILER_URL_TEMPLATE'],
         build=build)
@@ -76,7 +76,8 @@ def build_step_stdout(project_id, id):
 def settings(id):
     project = Project.query.get_or_404(id)
     return render_template(
-        'projects/settings.html', project=project)
+        'projects/settings.html', project=project,
+        fqdn=current_app.config['SERVER_NAME'])
 
 
 @bp.route('/<int:project_id>/hooks/add/', methods=['GET', 'POST'])

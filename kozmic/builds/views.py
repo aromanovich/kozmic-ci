@@ -76,6 +76,6 @@ def badge(gh_login, gh_name, ref):
         filename='img/badges/{}.png'.format(badge),
         _external=True,
         # Use https so that GitHub does not cache images served from HTTPS
-        _scheme='https' ))
+        _scheme='https'))
     response.status_code = 307
     return response
