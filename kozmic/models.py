@@ -260,12 +260,14 @@ class Project(db.Model):
         """
         return self.owner.gh.repository(self.gh_login, self.gh_name)
 
-    @property
-    def latest_build(self):
+    def get_latest_build(self, ref=None):
         """
         :type: :class:`Build`
         """
-        return self.builds.order_by(Build.created_at.desc()).first()
+        builds = self.builds.order_by(Build.number.desc())
+        if ref:
+            builds = builds.filter_by(gh_commit_ref=ref)
+        return builds.first()
 
 
 class Hook(db.Model):

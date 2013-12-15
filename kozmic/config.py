@@ -47,4 +47,4 @@ class TestingConfig(DefaultConfig):
     # decorator because of TESTING variable:
     LOGIN_DISABLED = False
     MAIL_SUPPRESS_SEND = True
-    MAIL_DEFAULT_SENDER = 'no-reply@kozmic.test'
+    MAIL_DEFAULT_SENDER = 'Kozmic CI <no-reply@kozmic.test>'

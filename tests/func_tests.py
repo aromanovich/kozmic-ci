@@ -471,7 +471,15 @@ class TestBadges(TestCase):
 
         self.build = factories.BuildFactory.create(
             project=self.project,
-            status='failure')
+            status='failure',
+            gh_commit_ref='feature-branch')
+
+        # master branch is still "success"
         r = self.w.get('/badges/aromanovich/flask-webtest/master')
+        assert r.status_code == 307
+        assert r.location == 'https://kozmic.test/static/img/badges/success.png'
+        
+        # feature-branch is "failure"
+        r = self.w.get('/badges/aromanovich/flask-webtest/feature-branch')
         assert r.status_code == 307
         assert r.location == 'https://kozmic.test/static/img/badges/failure.png'

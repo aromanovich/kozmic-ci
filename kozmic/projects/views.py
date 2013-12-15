@@ -46,7 +46,7 @@ def build(project_id, id_or_latest):
     project = Project.query.get_or_404(project_id)
 
     if id_or_latest == 'latest':
-        build = project.latest_build
+        build = project.get_latest_build()
         if not build:
             return redirect(url_for('.settings', id=project_id))
     else:

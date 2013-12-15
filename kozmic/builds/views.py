@@ -69,7 +69,7 @@ def hook(id):
 def badge(gh_login, gh_name, ref):
     project = Project.query.filter_by(
         gh_login=gh_login, gh_name=gh_name).first_or_404()
-    build = project.builds.order_by(Build.number.desc()).first()
+    build = project.get_latest_build(ref=ref)
     badge = build and build.status or 'success'
     response = redirect(url_for(
         'static',

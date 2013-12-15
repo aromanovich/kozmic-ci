@@ -10,7 +10,7 @@ from kozmic.models import (db, User, Project, Hook, HookCall,
 class Factory(factory.alchemy.SQLAlchemyModelFactory):
     FACTORY_SESSION = None
     ABSTRACT_FACTORY = True
-    
+
     @classmethod
     def _create(cls, target_class, *args, **kwargs):
         obj = super(Factory, cls)._create(target_class, *args, **kwargs)
@@ -36,7 +36,7 @@ class UserFactory(Factory):
     gh_name = factory.Sequence(lambda n: u'User %d' % n)
     gh_login = factory.Sequence(lambda n: u'user_%d' % n)
     gh_avatar_url = factory.Sequence(lambda n: u'http://example.com/%d.png' % n)
-    gh_access_token='token'
+    gh_access_token = 'token'
 
 
 class UserRepositoryFactory(Factory):
@@ -46,7 +46,7 @@ class UserRepositoryFactory(Factory):
     gh_id = factory.Sequence(lambda n: 1000 + n)
     gh_name = 'django'
     gh_full_name = 'johndoe/django'
-    
+
     @factory.lazy_attribute
     def gh_clone_url(self):
         return 'git://github.com/{}.git'.format(self.gh_full_name)
@@ -57,8 +57,8 @@ class OrganizationFactory(Factory):
 
     id = factory.Sequence(lambda n: n)
     gh_id = factory.Sequence(lambda n: n)
-    gh_login='pyconru'
-    gh_name='PyCon Russia'
+    gh_login = 'pyconru'
+    gh_name = 'PyCon Russia'
 
 
 class OrganizationRepositoryFactory(Factory):
@@ -68,7 +68,7 @@ class OrganizationRepositoryFactory(Factory):
     gh_id = factory.Sequence(lambda n: 2000 + n)
     gh_name = 'django'
     gh_full_name = 'johndoe/django'
-    
+
     @factory.lazy_attribute
     def gh_clone_url(self):
         return 'git://github.com/{}.git'.format(self.gh_full_name)
@@ -96,7 +96,7 @@ class BuildFactory(Factory):
     gh_commit_message = 'ok'
     gh_commit_ref = 'master'
     status = 'enqueued'
-    
+
     @factory.lazy_attribute
     def number(self):
         return len(self.project.builds.all()) + 1
@@ -104,8 +104,6 @@ class BuildFactory(Factory):
     @factory.lazy_attribute
     def created_at(self):
         days = self.number
-        if days % 2:
-            days *= -1
         return (datetime.datetime(2013, 11, 8, 20, 10, 25) +
                 datetime.timedelta(days=days))
 

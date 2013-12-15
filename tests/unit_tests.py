@@ -98,10 +98,10 @@ class TestUserDB(TestCase):
         assert set(rv) == self.projects
 
         rv = self.user_1.get_available_projects(annotate_with_latest_builds=True)
-        assert set(rv) == {(self.project_1, self.project_1.latest_build),
-                           (self.project_2, self.project_2.latest_build),
+        assert set(rv) == {(self.project_1, self.project_1.get_latest_build()),
+                           (self.project_2, self.project_2.get_latest_build()),
                            (self.project_3, None),
-                           (self.project_4, self.project_4.latest_build),
+                           (self.project_4, self.project_4.get_latest_build()),
                            (self.project_5, None)}
 
         assert set(self.user_2.get_available_projects()) == \
