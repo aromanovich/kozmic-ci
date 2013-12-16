@@ -62,7 +62,7 @@
       </dt>
       <dd>
         {% with id='build-step-{}-log'.format(step.id) %}
-          <pre id="{{ id }}" class="build-step-log">{{ step.stdout.decode('utf-8') or '' }}</pre>
+          <pre id="{{ id }}" class="build-step-log">{{ step.stdout and step.stdout.decode('utf-8') or '' }}</pre>
           {% if not step.finished_at %}
             <script language="javascript">
                 var s = new WebSocket(
