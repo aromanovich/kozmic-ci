@@ -58,7 +58,10 @@ function cleanup {{  # escape
   # To work around this we give everyone write permissions to the
   # all /kozmic subfolders.
 
-  chmod -R a+w $(find /kozmic -type d)
+  # Note: `|| true` to be sure that we will not change
+  # ./build-script return code by running `chmod`
+
+  chmod -Rf a+w $(find /kozmic -type d) || true
 }}  # escape
 trap cleanup EXIT
 
