@@ -15,6 +15,7 @@ from celery.utils.log import get_task_logger
 
 from kozmic import db, celery
 from kozmic.models import Build, BuildStep, HookCall
+from . import get_ansi_to_html_converter
 
 
 logger = get_task_logger(__name__)
@@ -35,13 +36,14 @@ class Tailer(threading.Thread):
         self._log_path = log_path
         self._redis_client = redis_client
         self._channel = channel
+        self._ansi_converter = get_ansi_to_html_converter()
 
     def run(self):
         logger.info(
             'Tailer has started. Log path: %s; channel name: %s.',
             self._log_path, self._channel)
         for line in tailf.tailf(self._log_path):
-            line += '\n'
+            line = self._ansi_converter.convert(line, full=False) + '\n'
             self._redis_client.publish(self._channel, line)
             self._redis_client.rpush(self._channel, line)
 

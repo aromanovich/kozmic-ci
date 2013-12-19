@@ -13,6 +13,10 @@
   ] -%}
 {% endif %}
 
+{% block extra_head %}
+  {{ render_ansi2html_style_tag()|safe }}
+{% endblock %}
+
 {% block content %}
   <dl class="dl-horizontal">
     <dt>#</dt>
@@ -62,8 +66,8 @@
       </dt>
       <dd>
         {% with id='build-step-{}-log'.format(step.id) %}
-          <pre id="{{ id }}" class="build-step-log">{{ step.stdout and step.stdout.decode('utf-8') or '' }}</pre>
-          {% if not step.finished_at %}
+          <pre id="{{ id }}" class="build-step-log">{{ (step.stdout and step.stdout.decode('utf-8') or '')|ansi2html|safe }}</pre>
+          {% if not step.finished_at and step.task_uuid %}
             <script language="javascript">
                 var s = new WebSocket(
                     '{{ tailer_url_template.format(task_uuid=step.task_uuid) }}');

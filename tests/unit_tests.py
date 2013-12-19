@@ -280,6 +280,24 @@ class TestTailer(TestCase):
         time.sleep(.5)
         assert KOZMIC_BLUES + '\n' == ''.join(redis_client.lrange('test', 0, -1))
 
+    def test_ansi_sequences_formatting(self):
+        colored_lines = [
+            '[4mRunning "jshint:lib" (jshint) task[24m',
+            '[36m->[0m running [36m1 suite',  # intentionally omit "[0m"
+        ]
+        with mock.patch('tailf.tailf', return_value=colored_lines):
+            redis_mock = mock.MagicMock()
+            kozmic.builds.tasks.Tailer('some-file.txt', redis_mock, 'test').start()
+
+        expected_calls = [
+            mock.call('test', '<span class="ansi4">Running "jshint:lib" '
+                              '(jshint) task</span>\n'),
+            mock.call('test', '<span class="ansi36">-&gt;</span> running '
+                              '<span class="ansi36">1 suite</span>\n')
+        ]
+        assert redis_mock.rpush.call_args_list == expected_calls
+        assert redis_mock.publish.call_args_list == expected_calls
+
 
 CREATE_TEST_REPO_SH = '''
 git init {repo_dir}

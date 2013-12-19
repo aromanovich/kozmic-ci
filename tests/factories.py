@@ -4,7 +4,7 @@ import datetime
 import factory.alchemy
 
 from kozmic.models import (db, User, Project, Hook, HookCall,
-                           Build, Organization)
+                           Build, BuildStep, Organization)
 
 
 class Factory(factory.alchemy.SQLAlchemyModelFactory):
@@ -114,6 +114,12 @@ class BuildFactory(Factory):
         return digest.hexdigest()
 
 
+class BuildStepFactory(Factory):
+    FACTORY_FOR = BuildStep
+
+    id = factory.Sequence(lambda n: n)
+
+
 class HookFactory(Factory):
     FACTORY_FOR = Hook
 
@@ -128,4 +134,7 @@ class HookCallFactory(Factory):
     FACTORY_FOR = HookCall
 
     id = factory.Sequence(lambda n: n)
-    gh_payload = '{}'
+
+    @factory.lazy_attribute
+    def gh_payload(self):
+        return {}

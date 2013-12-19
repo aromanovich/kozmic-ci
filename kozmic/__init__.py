@@ -30,8 +30,7 @@ def create_app(config=None):
     app.config.from_object(config)
     configure_extensions(app)
     configure_blueprints(app)
-    app.jinja_env.globals['bootstrap_is_hidden_field'] = \
-        lambda field: isinstance(field, wtforms.HiddenField)
+    register_jinja2_globals_and_filters(app)
     return app
 
 
@@ -69,6 +68,17 @@ def configure_blueprints(app):
     @app.route('/')
     def index():
         return flask.redirect(flask.url_for('projects.index'))
+
+
+def register_jinja2_globals_and_filters(app):
+    from kozmic.builds import get_ansi_to_html_converter
+    app.jinja_env.globals['bootstrap_is_hidden_field'] = \
+        lambda field: isinstance(field, wtforms.HiddenField)
+    ansi_converter = get_ansi_to_html_converter()
+    app.jinja_env.filters['ansi2html'] = \
+        lambda ansi: ansi_converter.convert(ansi, full=False)
+    app.jinja_env.globals['render_ansi2html_style_tag'] = \
+        ansi_converter.produce_headers
 
 
 def init_celery_app(app, celery):

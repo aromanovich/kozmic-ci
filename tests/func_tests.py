@@ -483,3 +483,24 @@ class TestBadges(TestCase):
         r = self.w.get('/badges/aromanovich/flask-webtest/feature-branch')
         assert r.status_code == 307
         assert r.location == 'https://kozmic.test/static/img/badges/failure.png'
+
+
+class TestBuilds(TestCase):
+    def setup_method(self, method):
+        TestCase.setup_method(self, method)
+
+        self.user = factories.UserFactory.create()
+        self.project = factories.ProjectFactory.create(owner=self.user)
+        self.hook = factories.HookFactory.create(project=self.project)
+        self.hook_call = factories.HookCallFactory.create(hook=self.hook)
+        self.build = factories.BuildFactory.create(project=self.project)
+        self.build_step = factories.BuildStepFactory.create(
+            build=self.build,
+            hook_call=self.hook_call,
+            stdout='[4mHello![24m')
+
+    def test_basics(self):
+        self.login(user_id=self.user.id)
+        r = self.w.get(url_for('projects.build', project_id=self.project.id,
+                               id=self.build.id))
+        assert '<span class="ansi4">Hello!</span>' in r
