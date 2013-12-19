@@ -61,7 +61,9 @@
         Output 
         {% if step.finished_at %}
           (<a href="{{ url_for('.build_step_stdout', project_id=project.id,
-                               id=step.id) }}">download</a>)
+                              id=step.id) }}">download</a>,
+          <a href="{{ url_for('.build_step_restart', project_id=project.id,
+                              id=step.id) }}">restart</a>)
         {% endif %}
       </dt>
       <dd>

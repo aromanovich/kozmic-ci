@@ -204,6 +204,28 @@ def _do_build(hook, build, task_uuid):
 
 
 @celery.task
+def restart_build_step(id):
+    step = BuildStep.query.get(id)
+    assert 'Step#{} does not exist.'.format(id)
+
+    if not step.is_finished():
+        return
+    
+    step.stdout = None
+    step.task_uuid = restart_build_step.request.id
+    step.started()
+    db.session.add(step)
+    db.session.commit()
+
+    return_code, stdout = _do_build(
+        step.hook_call.hook, step.build, step.task_uuid)
+
+    step.finished(return_code)
+    step.stdout = stdout
+    db.session.commit()
+
+
+@celery.task
 def do_build(build_id, hook_call_id):
     hook_call = HookCall.query.get(hook_call_id)
     assert hook_call, 'HookCall#{} does not exist.'.format(hook_call_id)
@@ -211,18 +233,17 @@ def do_build(build_id, hook_call_id):
     build = Build.query.get(build_id)
     assert build, 'Build#{} does not exist.'.format(build_id)
 
-    hook = hook_call.hook
-
     step = BuildStep(
         build=build,
         hook_call=hook_call,
         task_uuid=do_build.request.id)
     db.session.add(step)
+
     step.started()
     db.session.commit()
 
     return_code, stdout = _do_build(
-        hook, build, do_build.request.id)
+        hook_call.hook, build, step.task_uuid)
 
     step.finished(return_code)
     step.stdout = stdout

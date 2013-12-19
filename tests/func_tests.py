@@ -1,5 +1,6 @@
 # coding: utf-8
 import copy
+import datetime as dt
 
 import furl
 import mock
@@ -494,13 +495,29 @@ class TestBuilds(TestCase):
         self.hook = factories.HookFactory.create(project=self.project)
         self.hook_call = factories.HookCallFactory.create(hook=self.hook)
         self.build = factories.BuildFactory.create(project=self.project)
+
+    def test_basics(self):
         self.build_step = factories.BuildStepFactory.create(
             build=self.build,
             hook_call=self.hook_call,
             stdout='[4mHello![24m')
 
-    def test_basics(self):
         self.login(user_id=self.user.id)
         r = self.w.get(url_for('projects.build', project_id=self.project.id,
                                id=self.build.id))
         assert '<span class="ansi4">Hello!</span>' in r
+
+    def test_restart(self):
+        build_step = factories.BuildStepFactory.create(
+            build=self.build,
+            hook_call=self.hook_call,
+            finished_at=dt.datetime.utcnow(),
+            stdout='[4mHello![24m')
+        assert build_step.is_finished()
+
+        self.login(user_id=self.user.id)
+        r = self.w.get(url_for('projects.build', project_id=self.project.id,
+                               id=self.build.id))
+        with mock.patch('kozmic.builds.tasks.restart_build_step') as restart_build_step_mock:
+            r.click('restart').follow()
+            restart_build_step_mock.delay.assert_called_once_with(build_step.id)

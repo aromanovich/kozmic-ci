@@ -72,6 +72,16 @@ def build_step_stdout(project_id, id):
     return Response(build_step.stdout, mimetype='text/plain')
 
 
+@bp.route('/<int:project_id>/build-steps/<int:id>/restart/')
+def build_step_restart(project_id, id):
+    from kozmic.builds.tasks import restart_build_step
+    project = Project.query.get_or_404(project_id)
+    build_step = project.builds.join(BuildStep).filter(
+        BuildStep.id == id).with_entities(BuildStep).first_or_404()
+    restart_build_step.delay(build_step.id)
+    return redirect(url_for('.build', project_id=project.id, id=build_step.build.id))
+
+
 @bp.route('/<int:id>/settings/')
 def settings(id):
     project = Project.query.get_or_404(id)

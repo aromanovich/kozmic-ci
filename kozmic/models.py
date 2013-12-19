@@ -411,15 +411,15 @@ class BuildStep(db.Model):
     hook_call_id = db.Column(db.Integer, db.ForeignKey('hook_call.id'),
                              nullable=False)
 
-    # Time build step has started or None
+    #: Time build step has started or None
     started_at = db.Column(db.DateTime)
-    # Time build step has finished or None
+    #: Time build step has finished or None
     finished_at = db.Column(db.DateTime)
-    # Build return code
+    #: Build return code
     return_code = db.Column(db.Integer)
-    # Build log
+    #: Build log
     stdout = db.deferred(db.Column(sqlalchemy.dialects.mysql.MEDIUMBLOB))
-    # uuid of a Celery task that is running a build step
+    #: uuid of a Celery task that is running a build step
     task_uuid = db.Column(db.String(36))
     #: :class:`Build`
     build = db.relationship(Build, backref=db.backref('steps', lazy='dynamic'))
@@ -431,6 +431,7 @@ class BuildStep(db.Model):
         **Must** be called at build step start time.
         """
         self.started_at = datetime.datetime.utcnow()
+        self.finished_at = None
         description = 'Kozmic build #{0} is pending.'.format(self.build.number)
         self.build.set_status('pending', description=description)
 
@@ -459,3 +460,6 @@ class BuildStep(db.Model):
             description = 'Kozmic build #{0} has passed.'.format(self.build.number)
             self.build.set_status('success', description=description)
             return
+
+    def is_finished(self):
+        return bool(self.finished_at)
