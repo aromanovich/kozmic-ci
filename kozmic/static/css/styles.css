@@ -39,6 +39,10 @@ body {
 }
 
 .build-step-log {
-  max-height: 300px;
+  max-height: 400px;
   overflow: auto;
+  border: none;
+  background: #111;
+  color: #f5f5f5;
+  font-size: 12px;
 }
