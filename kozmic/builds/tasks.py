@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import tempfile
 import shutil
@@ -112,8 +113,15 @@ class Builder(threading.Thread):
         self._clone_url = clone_url
         self._sha = sha
         self.return_code = None
+        self.exc_info = None
 
     def run(self):
+        try:
+            self._run()
+        except:
+            self.exc_info = sys.exc_info()
+
+    def _run(self):
         logger.info('Builder has started.')
 
         build_dir_path = lambda f: os.path.join(self._build_dir, f)
@@ -144,10 +152,7 @@ class Builder(threading.Thread):
 
         client = docker.Client()
 
-        logger.info('Pulling %s image...', self._docker_image)
-        client.pull(self._docker_image)
-        logger.info('%s image has been pulled.', self._docker_image)
-
+        logger.info('Starting Docker process...')
         container = client.create_container(
             self._docker_image,
             command='bash /kozmic/build-starter.sh',
@@ -169,6 +174,21 @@ def _do_build(hook, build, task_uuid):
                                      port=config['KOZMIC_REDIS_PORT'],
                                      db=config['KOZMIC_REDIS_DATABASE'])
 
+    docker_image = hook.docker_image
+
+    client = docker.Client()
+    logger.info('Pulling %s image...', docker_image)
+    try:
+        client.pull(docker_image)
+        # Make sure that image has been successfully pulled by calling
+        # `inspect_image` on it:
+        client.inspect_image(docker_image)
+    except docker.APIError as e:
+        logger.info('Failed to pull %s: %s.', docker_image, e)
+        return 1, None, str(e)
+    else:
+        logger.info('%s image has been pulled.', docker_image)
+
     with create_temp_dir() as build_dir:
         channel = task_uuid
 
@@ -184,7 +204,7 @@ def _do_build(hook, build, task_uuid):
                 rsa_private_key=hook.project.rsa_private_key,
                 clone_url=hook.project.gh_clone_url,
                 passphrase=hook.project.passphrase,
-                docker_image=hook.docker_image,
+                docker_image=docker_image,
                 shell_code=hook.build_script,
                 sha=build.gh_commit_sha,
                 build_dir=build_dir)
@@ -200,7 +220,7 @@ def _do_build(hook, build, task_uuid):
             # stop listening pubsub channel
             redis_client.delete(channel)
 
-    return builder.return_code, stdout
+    return builder.return_code, builder.exc_info, stdout
 
 
 class RestartError(Exception):
@@ -237,9 +257,18 @@ def do_build(build_id, hook_call_id):
     step.started()
     db.session.commit()
 
-    return_code, stdout = _do_build(
+    return_code, exc_info, stdout = _do_build(
         hook_call.hook, build, step.task_uuid)
 
-    step.finished(return_code)
+    if exc_info:
+        step.finished(1)
+        stdout += ('\nSorry, something went wrong. We are notified of the '
+                   'issue and we will fix it soon.')
+    else:
+        step.finished(return_code)
+
     step.stdout = stdout
     db.session.commit()
+
+    if exc_info:
+        raise exc_info[1], None, exc_info[2]
