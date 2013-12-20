@@ -4,6 +4,7 @@ import time
 import unittest
 import tempfile
 import subprocess
+import datetime as dt
 
 import httpretty
 import pytest
@@ -420,3 +421,35 @@ class TestBuildTask(TestCase):
                 'success',
                 description='Kozmic build #{} has passed.'.format(build_id)),
         ])
+
+    def test_restart_build(self):
+        build_step = factories.BuildStepFactory.create(
+            build=self.build,
+            hook_call=self.hook_call,
+            finished_at=dt.datetime.utcnow(),
+            stdout='output')
+
+        assert self.build.steps.count() == 1
+        build_step_id_before_restart = build_step.id
+
+        with SessionScope(self.db):
+            set_status_patcher = mock.patch.object(Build, 'set_status')
+            _do_build_patcher = mock.patch('kozmic.builds.tasks._do_build',
+                                           return_value=(0, 'output'))
+
+            set_status_mock = set_status_patcher.start()
+            _do_build_mock = _do_build_patcher.start()
+            try:
+                kozmic.builds.tasks.restart_build_step(build_step.id)
+            finally:
+                _do_build_mock.stop()
+                set_status_patcher.stop()
+        self.db.session.rollback()
+
+        assert self.build.steps.count() == 1
+        assert _do_build_mock.called
+
+        build_step = self.build.steps.first()
+        assert build_step_id_before_restart != build_step.id
+        assert build_step.return_code == 0
+        assert build_step.stdout == 'output'

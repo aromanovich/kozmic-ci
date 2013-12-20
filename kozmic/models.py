@@ -426,6 +426,9 @@ class BuildStep(db.Model):
     #: :class:`HookCall`
     hook_call = db.relationship('HookCall')
 
+    def __repr__(self):
+        return u'<BuildStep #{0.id}>'.format(self)
+
     def started(self):
         """Sets :attr:`started_at` and updates :attr:`build` status.
         **Must** be called at build step start time.

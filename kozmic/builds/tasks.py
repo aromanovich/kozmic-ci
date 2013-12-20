@@ -207,22 +207,14 @@ def _do_build(hook, build, task_uuid):
 def restart_build_step(id):
     step = BuildStep.query.get(id)
     assert 'Step#{} does not exist.'.format(id)
-
     if not step.is_finished():
+        logger.warn('Tried to restart %r which is not finished.', step)
         return
-    
-    step.stdout = None
-    step.task_uuid = restart_build_step.request.id
-    step.started()
-    db.session.add(step)
-    db.session.commit()
 
-    return_code, stdout = _do_build(
-        step.hook_call.hook, step.build, step.task_uuid)
-
-    step.finished(return_code)
-    step.stdout = stdout
-    db.session.commit()
+    build_id = step.build_id
+    hook_call_id = step.hook_call_id
+    db.session.delete(step)
+    do_build.apply(args=(build_id, hook_call_id))
 
 
 @celery.task

@@ -48,3 +48,4 @@ class TestingConfig(DefaultConfig):
     LOGIN_DISABLED = False
     MAIL_SUPPRESS_SEND = True
     MAIL_DEFAULT_SENDER = 'Kozmic CI <no-reply@kozmic.test>'
+    CELERY_ALWAYS_EAGER = True
