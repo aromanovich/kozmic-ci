@@ -203,13 +203,16 @@ def _do_build(hook, build, task_uuid):
     return builder.return_code, stdout
 
 
+class RestartError(Exception):
+    pass
+
+
 @celery.task
 def restart_build_step(id):
     step = BuildStep.query.get(id)
     assert 'Step#{} does not exist.'.format(id)
     if not step.is_finished():
-        logger.warn('Tried to restart %r which is not finished.', step)
-        return
+        raise RestartError('Tried to restart %r which is not finished.', step)
 
     build_id = step.build_id
     hook_call_id = step.hook_call_id

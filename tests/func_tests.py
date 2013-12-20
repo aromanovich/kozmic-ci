@@ -513,6 +513,8 @@ class TestBuilds(TestCase):
             hook_call=self.hook_call,
             finished_at=dt.datetime.utcnow(),
             stdout='[4mHello![24m')
+        build_step.build.status = 'success'
+        self.db.session.commit()
         assert build_step.is_finished()
 
         self.login(user_id=self.user.id)
@@ -520,4 +522,5 @@ class TestBuilds(TestCase):
                                id=self.build.id))
         with mock.patch('kozmic.builds.tasks.restart_build_step') as restart_build_step_mock:
             r.click('restart').follow()
-            restart_build_step_mock.delay.assert_called_once_with(build_step.id)
+        restart_build_step_mock.delay.assert_called_once_with(build_step.id)
+        assert build_step.build.status == 'enqueued'

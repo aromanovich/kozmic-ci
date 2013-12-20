@@ -64,7 +64,7 @@ def build(project_id, id):
         build=build)
 
 
-@bp.route('/<int:project_id>/build-steps/<int:id>/')
+@bp.route('/<int:project_id>/build-steps/<int:id>/log/')
 def build_step_stdout(project_id, id):
     project = Project.query.get_or_404(project_id)
     build_step = project.builds.join(BuildStep).filter(
@@ -79,6 +79,8 @@ def build_step_restart(project_id, id):
     build_step = project.builds.join(BuildStep).filter(
         BuildStep.id == id).with_entities(BuildStep).first_or_404()
     restart_build_step.delay(build_step.id)
+    build_step.build.set_status('enqueued')
+    db.session.commit()
     return redirect(url_for('.build', project_id=project.id, id=build_step.build.id))
 
 
