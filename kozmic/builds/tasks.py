@@ -200,12 +200,15 @@ def _do_build(hook, build, task_uuid):
                 channel=channel)
             tailer.start()
 
+            # Convert Windows line endings to Unix:
+            build_script = '\n'.join(hook.build_script.splitlines())
+
             builder = Builder(
                 rsa_private_key=hook.project.rsa_private_key,
                 clone_url=hook.project.gh_clone_url,
                 passphrase=hook.project.passphrase,
                 docker_image=docker_image,
-                shell_code=hook.build_script,
+                shell_code=build_script,
                 sha=build.gh_commit_sha,
                 build_dir=build_dir)
             builder.start()
