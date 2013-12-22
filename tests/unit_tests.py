@@ -286,9 +286,9 @@ class TestTailer(TestCase):
             '[4mRunning "jshint:lib" (jshint) task[24m',
             '[36m->[0m running [36m1 suite',  # intentionally omit "[0m"
         ]
-        with mock.patch('tailf.tailf', return_value=colored_lines):
-            redis_mock = mock.MagicMock()
-            kozmic.builds.tasks.Tailer('some-file.txt', redis_mock, 'test').start()
+        redis_mock = mock.MagicMock()
+        tailer = kozmic.builds.tasks.Tailer('some-file.txt', redis_mock, 'test')
+        tailer._publish(colored_lines)
 
         expected_calls = [
             mock.call('test', '<span class="ansi4">Running "jshint:lib" '
@@ -395,14 +395,18 @@ class TestBuildTask(TestCase):
             set_status_patcher = mock.patch.object(Build, 'set_status')
             builder_patcher = mock.patch('kozmic.builds.tasks.Builder', new=BuilderStub)
             tailer_patcher = mock.patch('kozmic.builds.tasks.Tailer')
+            docker_patcher = mock.patch.multiple(
+                'docker.Client', pull=mock.DEFAULT, inspect_image=mock.DEFAULT)
 
             set_status_mock = set_status_patcher.start()
             builder_patcher.start()
             tailer_patcher.start()
+            docker_patcher.start()
             try:
                 kozmic.builds.tasks.do_build(build_id=self.build.id,
                                              hook_call_id=self.hook_call.id)
             finally:
+                docker_patcher.stop()
                 tailer_patcher.stop()
                 builder_patcher.stop()
                 set_status_patcher.stop()
@@ -435,7 +439,7 @@ class TestBuildTask(TestCase):
         with SessionScope(self.db):
             set_status_patcher = mock.patch.object(Build, 'set_status')
             _do_build_patcher = mock.patch('kozmic.builds.tasks._do_build',
-                                           return_value=(0, 'output'))
+                                           return_value=(0, None, 'output'))
 
             set_status_mock = set_status_patcher.start()
             _do_build_mock = _do_build_patcher.start()

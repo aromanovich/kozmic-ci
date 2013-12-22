@@ -7,6 +7,10 @@ import contextlib
 import threading
 import logging
 import pipes
+import multiprocessing.util
+import subprocess
+import fcntl
+import select
 
 import tailf
 import docker
@@ -34,19 +38,64 @@ class Tailer(threading.Thread):
 
     def __init__(self, log_path, redis_client, channel):
         threading.Thread.__init__(self)
+        self._stop = threading.Event()
         self._log_path = log_path
         self._redis_client = redis_client
         self._channel = channel
         self._ansi_converter = get_ansi_to_html_converter()
 
-    def run(self):
-        logger.info(
-            'Tailer has started. Log path: %s; channel name: %s.',
-            self._log_path, self._channel)
-        for line in tailf.tailf(self._log_path):
+    def stop(self):
+        self._stop.set()
+
+    def is_stopped(self):
+        return self._stop.isSet()
+
+    def _publish(self, lines):
+        for line in lines:
             line = self._ansi_converter.convert(line, full=False) + '\n'
             self._redis_client.publish(self._channel, line)
             self._redis_client.rpush(self._channel, line)
+
+    def run(self):
+        logger.info('Tailer is waiting for %s...', self._log_path)
+
+        while True:
+            if self.is_stopped():
+                return
+            if os.path.exists(self._log_path):
+                break
+            time.sleep(1)
+
+        logger.info(
+            'Tailer has started. Log path: %s; channel name: %s.',
+            self._log_path, self._channel)
+        tailf = subprocess.Popen(['/usr/bin/tail', '-f', self._log_path],
+                                 stdout=subprocess.PIPE)
+        try:
+            fl = fcntl.fcntl(tailf.stdout, fcntl.F_GETFL)
+            fcntl.fcntl(tailf.stdout, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+            buf = ''
+            while True:
+                if self.is_stopped():
+                    break
+                reads, _, _ = select.select([tailf.stdout], [], [], 0.1)
+                if not reads:
+                    continue
+
+                buf += tailf.stdout.read()
+                lines = buf.split('\n')
+
+                if lines[-1] == '':
+                    buf = ''
+                else:
+                    buf = lines[-1]
+                lines = lines[:-1]
+
+                self._publish(lines)
+        finally:
+            tailf.terminate()
+            tailf.wait()
 
 
 BUILD_STARTER_SH = '''
@@ -83,9 +132,7 @@ rm ./askpass.sh ./id_rsa
 git clone {clone_url} ./src
 cd ./src && git checkout -q {sha}
 
-# Disable stdout buffering and redirect it to the file
-# being tailed to the redis pubsub channel
-# TODO XXX Fix stdbuf
+# Redirect stdou to the file being tailed to the redis pubsub channel
 TERM=xterm bash -c "../build-script.sh" &> ../build.log
 '''.strip()
 
@@ -168,7 +215,7 @@ class Builder(threading.Thread):
         logger.info('Builder has finished.')
 
 
-def _do_build(hook, build, task_uuid):
+def _do_build(task_request, hook, build, task_uuid):
     config = current_app.config
     redis_client = redis.StrictRedis(host=config['KOZMIC_REDIS_HOST'],
                                      port=config['KOZMIC_REDIS_PORT'],
@@ -194,10 +241,12 @@ def _do_build(hook, build, task_uuid):
 
         try:
             log_path = os.path.join(build_dir, 'build.log')
+
             tailer = Tailer(
                 log_path=log_path,
                 redis_client=redis_client,
                 channel=channel)
+            multiprocessing.util.Finalize(task_request, tailer.stop)
             tailer.start()
 
             # Convert Windows line endings to Unix:
@@ -261,7 +310,7 @@ def do_build(build_id, hook_call_id):
     db.session.commit()
 
     return_code, exc_info, stdout = _do_build(
-        hook_call.hook, build, step.task_uuid)
+        do_build.request, hook_call.hook, build, step.task_uuid)
 
     if exc_info:
         step.finished(1)
