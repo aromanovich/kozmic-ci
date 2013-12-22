@@ -69,6 +69,15 @@
       <dd>
         {% with id='build-step-{}-log'.format(step.id) %}
           <pre id="{{ id }}" class="build-step-log">{{ (step.stdout and step.stdout.decode('utf-8') or '')|ansi2html|safe }}</pre>
+          <script language="javascript">
+            $(function() {
+                $('#{{ id }}').html(function(index, html) {
+                    if (html != '') {
+                        return html.replace(/\n*$/, '').replace(/^(.*)$/mg, "<span class=\"line\">$1</span>");
+                    }
+                });
+            });
+          </script>
           {% if not step.finished_at and step.task_uuid %}
             <script language="javascript">
                 var s = new WebSocket(
@@ -83,7 +92,10 @@
                     if (data.type == 'message') {
                         var log = $('#{{ id }}');
                         log.scrollTop(log[0].scrollHeight);
-                        log[0].innerHTML += data.content;
+                        if (data.content != '') {
+                            log[0].innerHTML += data.content.replace(/\n*$/, '').replace(
+                                /^(.*)$/mg, "<span class=\"line\">$1</span>") + '\n';
+                        }
                     } else if (data.type == 'status' && data.content == 'finished') {
                         location.reload(true);
                     }

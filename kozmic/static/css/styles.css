@@ -46,3 +46,27 @@ body {
   color: #f5f5f5;
   font-size: 12px;
 }
+
+
+.build-step-log {
+  max-height: 400px;
+  overflow: auto;
+  border: none;
+  background: #111;
+  color: #f5f5f5;
+  font-size: 12px;
+  counter-reset: line-numbering;
+  font-family: Menlo, Monaco, monospace;
+  padding: 5px;
+  word-break: break-word;
+}
+
+.build-step-log .line::before {
+  content: counter(line-numbering);
+  counter-increment: line-numbering;
+  padding-right: 1em;
+  /* space after numbers */
+  width: 1.5em;
+  text-align: right;
+  opacity: 0.5;
+}
