@@ -346,6 +346,7 @@ class TestBuilder(TestCase):
             with open(log_path, 'r') as log:
                 stdout = log.read().strip()
 
+        assert not builder.exc_info
         assert builder.return_code == 0
         assert stdout == 'Hello!'
 

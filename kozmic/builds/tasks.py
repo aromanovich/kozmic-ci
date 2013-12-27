@@ -57,15 +57,6 @@ class Tailer(threading.Thread):
             self._redis_client.rpush(self._channel, line)
 
     def run(self):
-        logger.info('Tailer is waiting for %s...', self._log_path)
-
-        while True:
-            if self.is_stopped():
-                return
-            if os.path.exists(self._log_path):
-                break
-            time.sleep(1)
-
         logger.info(
             'Tailer has started. Log path: %s; channel name: %s.',
             self._log_path, self._channel)
@@ -117,23 +108,24 @@ function cleanup {{  # escape
 }}  # escape
 trap cleanup EXIT
 
-cd kozmic
 # Add GitHub to known hosts
 ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
-
 # Start ssh-agent service...
 eval `ssh-agent -s`
 # ...and add private key to the agent, so we won't be asked
 # for passphrase on git clone. Let ssh-add read passphrase
 # by running askpass.sh for the security's sake.
-SSH_ASKPASS=./askpass.sh DISPLAY=:0.0 nohup ssh-add ./id_rsa
-rm ./askpass.sh ./id_rsa
+SSH_ASKPASS=/kozmic/askpass.sh DISPLAY=:0.0 nohup ssh-add /kozmic/id_rsa
+rm /kozmic/askpass.sh /kozmic/id_rsa
 
-git clone {clone_url} ./src
-cd ./src && git checkout -q {sha}
+git clone {clone_url} /kozmic/src
+cd /kozmic/src && git checkout -q {sha}
 
-# Redirect stdou to the file being tailed to the redis pubsub channel
-TERM=xterm bash -c "../build-script.sh" &> ../build.log
+groupadd -f admin
+useradd -m -d /home/kozmic -G admin -s /bin/bash kozmic
+chown -R kozmic /kozmic
+# Redirect stdout to the file being translated to the redis pubsub channel
+TERM=xterm su kozmic -c "/kozmic/build-script.sh" &> /kozmic/build.log
 '''.strip()
 
 ASKPASS_SH = '''
@@ -185,17 +177,17 @@ class Builder(threading.Thread):
             passphrase=pipes.quote(self._passphrase))
         with open(askpass_sh_path, 'w') as askpass_sh:
             askpass_sh.write(askpass_sh_content)
-        os.chmod(askpass_sh_path, 100)
+        os.chmod(askpass_sh_path, 0o100)
 
         id_rsa_path = build_dir_path('id_rsa')
         with open(id_rsa_path, 'w') as id_rsa:
             id_rsa.write(self._rsa_private_key)
-        os.chmod(id_rsa_path, 400)
+        os.chmod(id_rsa_path, 0o400)
 
         build_script_path = build_dir_path('build-script.sh')
         with open(build_script_path, 'w') as build_script:
             build_script.write(self._shell_code)
-        os.chmod(build_script_path, 755)
+        os.chmod(build_script_path, 0o755)
 
         client = docker.Client()
 
@@ -241,6 +233,9 @@ def _do_build(task_request, hook, build, task_uuid):
 
         try:
             log_path = os.path.join(build_dir, 'build.log')
+            with open(log_path, 'w') as log:
+                log.write('')
+            os.chmod(log_path, 0o664)
 
             tailer = Tailer(
                 log_path=log_path,
