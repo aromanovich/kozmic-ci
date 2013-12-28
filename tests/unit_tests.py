@@ -413,10 +413,10 @@ class TestBuildTask(TestCase):
                 set_status_patcher.stop()
         self.db.session.rollback()
 
-        assert self.build.steps.count() == 1
-        build_step = self.build.steps.first()
-        assert build_step.return_code == 0
-        assert build_step.stdout == 'Everything went great!\nGood bye.'
+        assert self.build.jobs.count() == 1
+        job = self.build.jobs.first()
+        assert job.return_code == 0
+        assert job.stdout == 'Everything went great!\nGood bye.'
         build_id = self.build.id
         set_status_mock.assert_has_calls([
             mock.call(
@@ -428,14 +428,14 @@ class TestBuildTask(TestCase):
         ])
 
     def test_restart_build(self):
-        build_step = factories.BuildStepFactory.create(
+        job = factories.JobFactory.create(
             build=self.build,
             hook_call=self.hook_call,
             finished_at=dt.datetime.utcnow(),
             stdout='output')
 
-        assert self.build.steps.count() == 1
-        build_step_id_before_restart = build_step.id
+        assert self.build.jobs.count() == 1
+        job_id_before_restart = job.id
 
         with SessionScope(self.db):
             set_status_patcher = mock.patch.object(Build, 'set_status')
@@ -445,16 +445,16 @@ class TestBuildTask(TestCase):
             set_status_mock = set_status_patcher.start()
             _do_build_mock = _do_build_patcher.start()
             try:
-                kozmic.builds.tasks.restart_build_step(build_step.id)
+                kozmic.builds.tasks.restart_job(job.id)
             finally:
                 _do_build_mock.stop()
                 set_status_patcher.stop()
         self.db.session.rollback()
 
-        assert self.build.steps.count() == 1
+        assert self.build.jobs.count() == 1
         assert _do_build_mock.called
 
-        build_step = self.build.steps.first()
-        assert build_step_id_before_restart != build_step.id
-        assert build_step.return_code == 0
-        assert build_step.stdout == 'output'
+        job = self.build.jobs.first()
+        assert job_id_before_restart != job.id
+        assert job.return_code == 0
+        assert job.stdout == 'output'

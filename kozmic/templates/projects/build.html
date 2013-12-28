@@ -48,27 +48,25 @@
     </script>
   {% endif %}
 
-  {% for step in build.steps %}
-    <h4>{{ step.hook_call.hook.title }} hook</h4>
+  {% for job in build.jobs %}
+    <h4>{{ job.hook_call.hook.title }} hook</h4>
     <dl>
       <dt>Started at</dt>
-      <dd>{{ step.started_at }}</dd>
+      <dd>{{ job.started_at }}</dd>
       <dt>Finished at</dt>
-      <dd>{{ step.finished_at }}</dd>
+      <dd>{{ job.finished_at }}</dd>
       <dt>Return code</dt>
-      <dd>{{ step.return_code }}</dd>
+      <dd>{{ job.return_code }}</dd>
       <dt>
         Output 
-        {% if step.finished_at %}
-          (<a href="{{ url_for('.build_step_stdout', project_id=project.id,
-                              id=step.id) }}">download</a>,
-          <a href="{{ url_for('.build_step_restart', project_id=project.id,
-                              id=step.id) }}">restart</a>)
+        {% if job.is_finished() %}
+          (<a href="{{ url_for('.job_log', project_id=project.id, id=job.id) }}">download</a>,
+          <a href="{{ url_for('.job_restart', project_id=project.id, id=job.id) }}">restart</a>)
         {% endif %}
       </dt>
       <dd>
-        {% with id='build-step-{}-log'.format(step.id) %}
-          <pre id="{{ id }}" class="build-step-log">{{ (step.stdout and step.stdout.decode('utf-8') or '')|ansi2html|safe }}</pre>
+        {% with id='job-{}-log'.format(job.id) %}
+          <pre id="{{ id }}" class="job-log">{{ (job.stdout and job.stdout.decode('utf-8') or '')|ansi2html|safe }}</pre>
           <script language="javascript">
             $(function() {
                 $('#{{ id }}').html(function(index, html) {
@@ -78,10 +76,10 @@
                 });
             });
           </script>
-          {% if not step.finished_at and step.task_uuid %}
+          {% if not job.is_finished() and job.task_uuid %}
             <script language="javascript">
                 var s = new WebSocket(
-                    '{{ tailer_url_template.format(task_uuid=step.task_uuid) }}');
+                    '{{ tailer_url_template.format(task_uuid=job.task_uuid) }}');
 
                 s.onopen = function() {
                     console.debug('connected');

@@ -38,17 +38,7 @@ body {
   height: 38px;
 }
 
-.build-step-log {
-  max-height: 400px;
-  overflow: auto;
-  border: none;
-  background: #111;
-  color: #f5f5f5;
-  font-size: 12px;
-}
-
-
-.build-step-log {
+.job-log {
   max-height: 400px;
   overflow: auto;
   border: none;
@@ -61,7 +51,7 @@ body {
   word-break: break-word;
 }
 
-.build-step-log .line::before {
+.job-log .line::before {
   content: counter(line-numbering);
   counter-increment: line-numbering;
   padding-right: 1em;

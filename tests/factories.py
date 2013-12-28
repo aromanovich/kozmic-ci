@@ -4,7 +4,7 @@ import datetime
 import factory.alchemy
 
 from kozmic.models import (db, User, Project, Hook, HookCall,
-                           Build, BuildStep, Organization)
+                           Build, Job, Organization)
 
 
 class Factory(factory.alchemy.SQLAlchemyModelFactory):
@@ -114,8 +114,8 @@ class BuildFactory(Factory):
         return digest.hexdigest()
 
 
-class BuildStepFactory(Factory):
-    FACTORY_FOR = BuildStep
+class JobFactory(Factory):
+    FACTORY_FOR = Job
 
     id = factory.Sequence(lambda n: n)
 

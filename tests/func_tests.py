@@ -10,7 +10,7 @@ import github3.git
 from flask import url_for
 
 import kozmic.builds.tasks
-from kozmic.models import User, Project, Hook, HookCall, Build, BuildStep
+from kozmic.models import User, Project, Hook, HookCall, Build, Job
 from . import TestCase, func_fixtures as fixtures
 from . import factories, unit_tests
 
@@ -497,7 +497,7 @@ class TestBuilds(TestCase):
         self.build = factories.BuildFactory.create(project=self.project)
 
     def test_basics(self):
-        self.build_step = factories.BuildStepFactory.create(
+        self.job = factories.JobFactory.create(
             build=self.build,
             hook_call=self.hook_call,
             stdout='[4mHello![24m')
@@ -508,19 +508,19 @@ class TestBuilds(TestCase):
         assert '<span class="ansi4">Hello!</span>' in r
 
     def test_restart(self):
-        build_step = factories.BuildStepFactory.create(
+        job = factories.JobFactory.create(
             build=self.build,
             hook_call=self.hook_call,
             finished_at=dt.datetime.utcnow(),
             stdout='[4mHello![24m')
-        build_step.build.status = 'success'
+        job.build.status = 'success'
         self.db.session.commit()
-        assert build_step.is_finished()
+        assert job.is_finished()
 
         self.login(user_id=self.user.id)
         r = self.w.get(url_for('projects.build', project_id=self.project.id,
                                id=self.build.id))
-        with mock.patch('kozmic.builds.tasks.restart_build_step') as restart_build_step_mock:
+        with mock.patch('kozmic.builds.tasks.restart_job') as restart_job_mock:
             r.click('restart').follow()
-        restart_build_step_mock.delay.assert_called_once_with(build_step.id)
-        assert build_step.build.status == 'enqueued'
+        restart_job_mock.delay.assert_called_once_with(job.id)
+        assert job.build.status == 'enqueued'

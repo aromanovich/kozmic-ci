@@ -8,7 +8,7 @@ from flask.ext.login import current_user
 from . import bp
 from .forms import HookForm, MemberForm
 from kozmic import db, perms
-from kozmic.models import Project, Hook, Build, BuildStep, User
+from kozmic.models import Project, Hook, Build, Job, User
 
 
 logger = logging.getLogger(__name__)
@@ -64,24 +64,27 @@ def build(project_id, id):
         build=build)
 
 
-@bp.route('/<int:project_id>/build-steps/<int:id>/log/')
-def build_step_stdout(project_id, id):
+@bp.route('/<int:project_id>/jobs/<int:id>/log/')
+def job_log(project_id, id):
     project = Project.query.get_or_404(project_id)
-    build_step = project.builds.join(BuildStep).filter(
-        BuildStep.id == id).with_entities(BuildStep).first_or_404()
-    return Response(build_step.stdout, mimetype='text/plain')
+    job = project.builds.join(Job).filter(
+        Job.id == id).with_entities(Job).first_or_404()
+    return Response(job.stdout, mimetype='text/plain')
 
 
-@bp.route('/<int:project_id>/build-steps/<int:id>/restart/')
-def build_step_restart(project_id, id):
-    from kozmic.builds.tasks import restart_build_step
+@bp.route('/<int:project_id>/job/<int:id>/restart/')
+def job_restart(project_id, id):
+    # Import at runtime for easier mocking:
+    from kozmic.builds.tasks import restart_job
+
     project = Project.query.get_or_404(project_id)
-    build_step = project.builds.join(BuildStep).filter(
-        BuildStep.id == id).with_entities(BuildStep).first_or_404()
-    restart_build_step.delay(build_step.id)
-    build_step.build.set_status('enqueued')
+    job = project.builds.join(Job).filter(
+        Job.id == id).with_entities(Job).first_or_404()
+    restart_job.delay(job.id)
+    job.build.set_status('enqueued')
+    job.stdout = ''
     db.session.commit()
-    return redirect(url_for('.build', project_id=project.id, id=build_step.build.id))
+    return redirect(url_for('.build', project_id=project.id, id=job.build.id))
 
 
 @bp.route('/<int:id>/settings/')

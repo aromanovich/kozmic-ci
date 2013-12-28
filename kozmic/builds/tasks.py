@@ -19,7 +19,7 @@ from flask import current_app
 from celery.utils.log import get_task_logger
 
 from kozmic import db, celery
-from kozmic.models import Build, BuildStep, HookCall
+from kozmic.models import Build, Job, HookCall
 from . import get_ansi_to_html_converter
 
 
@@ -275,15 +275,15 @@ class RestartError(Exception):
 
 
 @celery.task
-def restart_build_step(id):
-    step = BuildStep.query.get(id)
-    assert 'Step#{} does not exist.'.format(id)
-    if not step.is_finished():
-        raise RestartError('Tried to restart %r which is not finished.', step)
+def restart_job(id):
+    job = Job.query.get(id)
+    assert 'Job#{} does not exist.'.format(id)
+    if not job.is_finished():
+        raise RestartError('Tried to restart %r which is not finished.', job)
 
-    build_id = step.build_id
-    hook_call_id = step.hook_call_id
-    db.session.delete(step)
+    build_id = job.build_id
+    hook_call_id = job.hook_call_id
+    db.session.delete(job)
     do_build.apply(args=(build_id, hook_call_id))
 
 
@@ -295,26 +295,26 @@ def do_build(build_id, hook_call_id):
     build = Build.query.get(build_id)
     assert build, 'Build#{} does not exist.'.format(build_id)
 
-    step = BuildStep(
+    job = Job(
         build=build,
         hook_call=hook_call,
         task_uuid=do_build.request.id)
-    db.session.add(step)
+    db.session.add(job)
 
-    step.started()
+    job.started()
     db.session.commit()
 
     return_code, exc_info, stdout = _do_build(
-        do_build.request, hook_call.hook, build, step.task_uuid)
+        do_build.request, hook_call.hook, build, job.task_uuid)
 
     if exc_info:
-        step.finished(1)
+        job.finished(1)
         stdout += ('\nSorry, something went wrong. We are notified of the '
                    'issue and we will fix it soon.')
     else:
-        step.finished(return_code)
+        job.finished(return_code)
 
-    step.stdout = stdout
+    job.stdout = stdout
     db.session.commit()
 
     if exc_info:

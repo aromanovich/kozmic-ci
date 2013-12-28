@@ -343,18 +343,18 @@ class Build(db.Model):
 
     @property
     def started_at(self):
-        """Time the first build step has started or None
-        if there is no started steps yet.
+        """Time the first job has started or None if there is
+        no started jobs yet.
         """
-        started_ats = filter(bool, [step.started_at for step in self.steps])
+        started_ats = filter(bool, [job.started_at for job in self.jobs])
         return started_ats and min(started_ats) or None
 
     @property
     def finished_at(self):
-        """Time the last build step has finished or None
-        if there is no finished steps yet.
+        """Time the last job has finished or None if there is
+        no finished jobs yet.
         """
-        finished_ats = filter(bool, [step.finished_at for step in self.steps])
+        finished_ats = filter(bool, [job.finished_at for job in self.jobs])
         return finished_ats and min(finished_ats) or None
 
     def set_status(self, status, target_url='', description=''):
@@ -401,37 +401,39 @@ class Build(db.Model):
             'projects.build', project_id=self.project.id, id=self.id)
 
 
-class BuildStep(db.Model):
+class Job(db.Model):
     """Corresponds to a hook call and contains results of a running
     hook build script.
     """
+    __tablename__ = 'build_step'
+
     id = db.Column(db.Integer, primary_key=True)
     build_id = db.Column(db.Integer, db.ForeignKey('build.id'),
                          nullable=False)
     hook_call_id = db.Column(db.Integer, db.ForeignKey('hook_call.id'),
                              nullable=False)
 
-    #: Time build step has started or None
+    #: Time job has started or None
     started_at = db.Column(db.DateTime)
-    #: Time build step has finished or None
+    #: Time job has finished or None
     finished_at = db.Column(db.DateTime)
     #: Build return code
     return_code = db.Column(db.Integer)
     #: Build log
     stdout = db.deferred(db.Column(sqlalchemy.dialects.mysql.MEDIUMBLOB))
-    #: uuid of a Celery task that is running a build step
+    #: uuid of a Celery task that is running a job
     task_uuid = db.Column(db.String(36))
     #: :class:`Build`
-    build = db.relationship(Build, backref=db.backref('steps', lazy='dynamic'))
+    build = db.relationship(Build, backref=db.backref('jobs', lazy='dynamic'))
     #: :class:`HookCall`
     hook_call = db.relationship('HookCall')
 
     def __repr__(self):
-        return u'<BuildStep #{0.id}>'.format(self)
+        return u'<Job #{0.id}>'.format(self)
 
     def started(self):
         """Sets :attr:`started_at` and updates :attr:`build` status.
-        **Must** be called at build step start time.
+        **Must** be called when the job is started.
         """
         self.started_at = datetime.datetime.utcnow()
         self.finished_at = None
@@ -440,7 +442,7 @@ class BuildStep(db.Model):
 
     def finished(self, return_code):
         """Sets :attr:`finished_at` and updates :attr:`build` status.
-        **Must** be called at build step finish time.
+        **Must** be called when the job is finished.
         """
         self.return_code = return_code
         self.finished_at = datetime.datetime.utcnow()
@@ -454,12 +456,12 @@ class BuildStep(db.Model):
             self.build.set_status('failure', description=description)
             return
 
-        steps = self.build.steps
-        all_other_steps_finished = all(step.finished_at for step in steps
-                                       if step.id != self.id)
-        all_other_steps_succeeded = all(step.return_code == 0 for step in steps
-                                        if step.id != self.id)
-        if all_other_steps_finished and all_other_steps_succeeded:
+        jobs = self.build.jobs
+        all_other_jobs_finished = all(job.finished_at for job in jobs
+                                      if job.id != self.id)
+        all_other_jobs_succeeded = all(job.return_code == 0 for job in jobs
+                                       if job.id != self.id)
+        if all_other_jobs_finished and all_other_jobs_succeeded:
             description = 'Kozmic build #{0} has passed.'.format(self.build.number)
             self.build.set_status('success', description=description)
             return
