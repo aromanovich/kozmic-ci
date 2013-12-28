@@ -85,11 +85,11 @@ class Tailer(threading.Thread):
                 if not reads:
                     iterations_without_read += 1
                     if iterations_without_read * read_timeout > self._kill_timeout:
-                        self._kill_container()
                         message = 'Sorry, your build has stalled and been killed.\n'
                         with open(self._log_path, 'a') as log:
                             log.write(message)
                         self._publish([message])
+                        self._kill_container()
                         return
                     continue
                 else:
