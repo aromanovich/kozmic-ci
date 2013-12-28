@@ -16,6 +16,7 @@ class DefaultConfig(object):
     KOZMIC_REDIS_HOST = 'localhost'
     KOZMIC_REDIS_PORT = 6379
     KOZMIC_REDIS_DATABASE = 0
+    KOZMIC_STALL_TIMEOUT = 600
 
     BROKER_URL = 'redis://{host}:{port}/{db}'.format(
         host=KOZMIC_REDIS_HOST,

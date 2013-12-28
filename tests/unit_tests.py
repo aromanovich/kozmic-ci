@@ -4,6 +4,7 @@ import time
 import unittest
 import tempfile
 import subprocess
+import Queue
 import datetime as dt
 
 import httpretty
@@ -254,6 +255,12 @@ Through another lonely day, whoaa.
 
 
 class TestTailer(TestCase):
+    # We can't mock _kill_container method in ahother thread,
+    # so just make it no-op to ease testing.
+    class _Tailer(kozmic.builds.tasks.Tailer):
+        def _kill_container(self):
+            pass
+
     def test_tailer(self):
         config = current_app.config
         redis_client = redis.StrictRedis(host=config['KOZMIC_REDIS_HOST'],
@@ -265,7 +272,11 @@ class TestTailer(TestCase):
         listener = channel.listen()
 
         with tempfile.NamedTemporaryFile(mode='a+b') as f:
-            tailer = kozmic.builds.tasks.Tailer(f.name, redis_client, 'test')
+            tailer = self._Tailer(
+                log_path=f.name,
+                redis_client=redis_client,
+                channel='test',
+                container=mock.MagicMock())
             tailer.start()
             time.sleep(.5)
 
@@ -287,7 +298,11 @@ class TestTailer(TestCase):
             '[36m->[0m running [36m1 suite',  # intentionally omit "[0m"
         ]
         redis_mock = mock.MagicMock()
-        tailer = kozmic.builds.tasks.Tailer('some-file.txt', redis_mock, 'test')
+        tailer = self._Tailer(
+            log_path='some-file.txt',
+            redis_client=redis_mock,
+            channel='test',
+            container=mock.MagicMock())
         tailer._publish(colored_lines)
 
         expected_calls = [
@@ -298,6 +313,28 @@ class TestTailer(TestCase):
         ]
         assert redis_mock.rpush.call_args_list == expected_calls
         assert redis_mock.publish.call_args_list == expected_calls
+
+    def test_kill_timeout_is_working(self):
+        with tempfile.NamedTemporaryFile(mode='a+b') as f:
+            tailer = self._Tailer(
+                log_path=f.name,
+                redis_client=mock.MagicMock(),
+                channel='test',
+                container={'Id': '564fe66af3aa755d79797e1'},
+                kill_timeout=2)
+
+
+            with mock.patch.object(tailer, '_kill_container') as kill_container_mock:
+                with mock.patch.object(tailer, '_publish') as publish_mock:
+                    tailer.start()
+                    time.sleep(1)
+                    assert not kill_container_mock.called
+                    time.sleep(2)
+                    kill_container_mock.assert_called_once_with()
+
+            message = 'Sorry, your build has stalled and been killed.\n'
+            assert message in f.read()
+            publish_mock.assert_called_once_with([message])
 
 
 CREATE_TEST_REPO_SH = '''
@@ -332,6 +369,7 @@ class TestBuilder(TestCase):
         with kozmic.builds.tasks.create_temp_dir() as build_dir:
             sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
 
+            container_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
                 rsa_private_key=private_key,
                 passphrase=passphrase,
@@ -339,8 +377,13 @@ class TestBuilder(TestCase):
                 shell_code='bash ./kozmic.sh',
                 build_dir=build_dir,
                 clone_url='/kozmic/test-repo',
-                sha=sha)
-            builder.run()
+                sha=sha,
+                container_queue=container_queue)
+            builder.start()
+            container = container_queue.get(True, 60)
+            assert isinstance(container, dict) and 'Id' in container
+            container_queue.task_done()
+            builder.join()
 
             log_path = os.path.join(build_dir, 'build.log')
             with open(log_path, 'r') as log:
@@ -357,6 +400,7 @@ class TestBuilder(TestCase):
         with kozmic.builds.tasks.create_temp_dir() as build_dir:
             sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
 
+            container_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
                 rsa_private_key=self._generate_private_key('passphrase'),
                 passphrase='wrong-passphrase',
@@ -364,7 +408,8 @@ class TestBuilder(TestCase):
                 shell_code='bash ./kozmic.sh',
                 build_dir=build_dir,
                 clone_url='/kozmic/test-repo',
-                sha=sha)
+                sha=sha,
+                container_queue=mock.MagicMock())
             builder.run()
 
         assert builder.return_code == 1
@@ -373,6 +418,8 @@ class TestBuilder(TestCase):
 class BuilderStub(kozmic.builds.tasks.Builder):
     def run(self):
         time.sleep(1)
+
+        self._container_queue.put({'Id': 'qwerty'}, block=True, timeout=60)
 
         build_log_path = os.path.join(self._build_dir, 'build.log')
         with open(build_log_path, 'w') as build_log:

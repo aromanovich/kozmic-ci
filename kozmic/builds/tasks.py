@@ -11,6 +11,7 @@ import multiprocessing.util
 import subprocess
 import fcntl
 import select
+import Queue
 
 import tailf
 import docker
@@ -36,12 +37,14 @@ def create_temp_dir():
 class Tailer(threading.Thread):
     daemon = True
 
-    def __init__(self, log_path, redis_client, channel):
+    def __init__(self, log_path, redis_client, channel, container, kill_timeout=600):
         threading.Thread.__init__(self)
         self._stop = threading.Event()
         self._log_path = log_path
         self._redis_client = redis_client
         self._channel = channel
+        self._container = container
+        self._kill_timeout = kill_timeout
         self._ansi_converter = get_ansi_to_html_converter()
 
     def stop(self):
@@ -56,6 +59,12 @@ class Tailer(threading.Thread):
             self._redis_client.publish(self._channel, line)
             self._redis_client.rpush(self._channel, line)
 
+    def _kill_container(self):
+        client = docker.Client()
+        logger.info('Tailer is killing %s', self._container)
+        client.kill(self._container)
+        logger.info('%s has been killed.', self._container)
+
     def run(self):
         logger.info(
             'Tailer has started. Log path: %s; channel name: %s.',
@@ -67,12 +76,24 @@ class Tailer(threading.Thread):
             fcntl.fcntl(tailf.stdout, fcntl.F_SETFL, fl | os.O_NONBLOCK)
 
             buf = ''
+            read_timeout = 0.5
+            iterations_without_read = 0
             while True:
                 if self.is_stopped():
                     break
-                reads, _, _ = select.select([tailf.stdout], [], [], 0.1)
+                reads, _, _ = select.select([tailf.stdout], [], [], read_timeout)
                 if not reads:
+                    iterations_without_read += 1
+                    if iterations_without_read * read_timeout > self._kill_timeout:
+                        self._kill_container()
+                        message = 'Sorry, your build has stalled and been killed.\n'
+                        with open(self._log_path, 'a') as log:
+                            log.write(message)
+                        self._publish([message])
+                        return
                     continue
+                else:
+                    iterations_without_read = 0
 
                 buf += tailf.stdout.read()
                 lines = buf.split('\n')
@@ -142,7 +163,7 @@ echo {passphrase}
 
 class Builder(threading.Thread):
     def __init__(self, rsa_private_key, passphrase, docker_image,
-                 shell_code, build_dir, clone_url, sha):
+                 shell_code, build_dir, clone_url, sha, container_queue):
         threading.Thread.__init__(self)
         self._docker_image = docker_image
         self._shell_code = shell_code
@@ -151,6 +172,7 @@ class Builder(threading.Thread):
         self._passphrase = passphrase
         self._clone_url = clone_url
         self._sha = sha
+        self._container_queue = container_queue
         self.return_code = None
         self.exc_info = None
 
@@ -196,9 +218,13 @@ class Builder(threading.Thread):
             self._docker_image,
             command='bash /kozmic/build-starter.sh',
             volumes={'/kozmic': {}})
-        client.start(container, binds={self._build_dir: '/kozmic'})
 
+        self._container_queue.put(container, block=True, timeout=60)
+        self._container_queue.join()
+
+        client.start(container, binds={self._build_dir: '/kozmic'})
         logger.info('Docker process %s has started.', container)
+
         self.return_code = client.wait(container)
         logger.info(client.logs(container))
         logger.info('Docker process %s has finished with return code %i.',
@@ -237,16 +263,10 @@ def _do_build(task_request, hook, build, task_uuid):
                 log.write('')
             os.chmod(log_path, 0o664)
 
-            tailer = Tailer(
-                log_path=log_path,
-                redis_client=redis_client,
-                channel=channel)
-            multiprocessing.util.Finalize(task_request, tailer.stop)
-            tailer.start()
-
             # Convert Windows line endings to Unix:
             build_script = '\n'.join(hook.build_script.splitlines())
 
+            container_queue = Queue.Queue()
             builder = Builder(
                 rsa_private_key=hook.project.rsa_private_key,
                 clone_url=hook.project.gh_clone_url,
@@ -254,8 +274,21 @@ def _do_build(task_request, hook, build, task_uuid):
                 docker_image=docker_image,
                 shell_code=build_script,
                 sha=build.gh_commit_sha,
-                build_dir=build_dir)
+                build_dir=build_dir,
+                container_queue=container_queue)
             builder.start()
+
+            container = container_queue.get(True, 60)
+            tailer = Tailer(
+                log_path=log_path,
+                redis_client=redis_client,
+                channel=channel,
+                container=container,
+                kill_timeout=config['KOZMIC_STALL_TIMEOUT'])
+            multiprocessing.util.Finalize(task_request, tailer.stop)
+            tailer.start()
+            container_queue.task_done()
+
             builder.join()
 
             stdout = ''
