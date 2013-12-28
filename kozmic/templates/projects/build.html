@@ -1,5 +1,7 @@
 {% extends 'projects/_base.html' %}
 
+{% from '_utils.html' import render_status %}
+
 {% if id == 'latest' %}
   {% set active_tab = 'latest-build' %}
 {% else %}
@@ -22,12 +24,7 @@
     <dt>#</dt>
     <dd>{{ build.number }}</dd>
     <dt>Status</dt>
-    <dd>
-      <span class="label
-        label-{% if build.status == 'success' %}success{% elif build.status == 'failed' %}danger{% else %}default{% endif %}">
-        {{ build.status|capitalize }}
-      </span>
-    </dd>
+    <dd>{{ render_status(build.status) }}</dd>
     <dt>Started at</dt>
     <dd>{{ build.started_at }}</dd>
     <dt>Finished at</dt>

@@ -1,4 +1,7 @@
 {% extends 'projects/_base.html' %}
+
+{% from '_utils.html' import render_status %}
+
 {% set active_tab = 'build-history' %}
 
 {% block content %}
@@ -17,12 +20,7 @@
     {% for build in builds %}
       <tr>
         <td>{{ build.number }}</td>
-        <td>
-          <span class="label
-            label-{% if build.status == 'success' %}success{% elif build.status == 'failed' %}danger{% else %}default{% endif %}">
-            {{ build.status|capitalize }}
-          </span>
-        </td>
+        <td>{{ render_status(build.status) }}</td>
         <td>{{ build.started_at }}</td>
         <td>{{ build.finished_at }}</td>
         <td>{{ build.gh_commit_sha }}</td>

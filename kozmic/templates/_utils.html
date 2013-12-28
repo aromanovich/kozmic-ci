@@ -1,3 +1,11 @@
+{% macro render_status(status) %}
+  <span class="label label-{% if status == 'success' %}success{% elif status == 'failure' %}danger{% else %}default{% endif %}">
+    {{ status|capitalize }}
+  </span>
+{% endmacro %}
+
+
+
 {% macro form_errors(form, hiddens=True) %}
   {%- if form.errors %}
     {%- for fieldname, errors in form.errors.items() %}
