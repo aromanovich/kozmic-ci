@@ -98,7 +98,6 @@ def job_restart(project_id, id):
         Job.id == id).with_entities(Job).first_or_404()
     restart_job.delay(job.id)
     job.build.set_status('enqueued')
-    job.stdout = ''
     db.session.commit()
     return redirect(url_for('.build', project_id=project.id, id=job.build.id))
 

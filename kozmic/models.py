@@ -472,4 +472,19 @@ class Job(db.Model):
             return
 
     def is_finished(self):
-        return bool(self.finished_at)
+        return self.status in ('success', 'failure', 'error')
+
+    @property
+    def status(self):
+        """One of the following values: 'enqueued', 'success', 'pending',
+        'failure', 'error'.
+        """
+        if not self.started_at:
+            return 'enqueued'
+        elif self.started_at and not self.finished_at:
+            return 'pending'
+        elif self.finished_at:
+            if self.return_code == 0:
+                return 'success'
+            else:
+                return 'failure'

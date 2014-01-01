@@ -511,6 +511,7 @@ class TestBuilds(TestCase):
         job = factories.JobFactory.create(
             build=self.build,
             hook_call=self.hook_call,
+            started_at=dt.datetime.utcnow() - dt.timedelta(minutes=2),
             finished_at=dt.datetime.utcnow(),
             stdout='[4mHello![24m')
         job.build.status = 'success'

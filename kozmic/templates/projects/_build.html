@@ -47,17 +47,8 @@
     <ul class="nav nav-tabs">
       {% for job_ in build.jobs %}
         <li{% if job_.id == job.id %} class="active"{% endif %}>
-          {% if job_.is_finished() %}
-            {% if job_.return_code == 0 %}
-              {% set status='success' %}
-            {% else %}
-              {% set status='failure' %}
-            {% endif %}
-          {% else %}
-            {% set status='pending' %}
-          {% endif %}
           <a href="{{ url_for('.job', project_id=project.id, build_id=build.id, id=job_.id) }}">
-            "{{ job.hook_call.hook.title }}" job {{ render_status(status, text='●', type='badge') }}
+            "{{ job.hook_call.hook.title }}" job {{ render_status(job_.status, text='●', type='badge') }}
           </a>
         </li>
       {% endfor %}
