@@ -270,7 +270,6 @@ class Project(db.Model):
         return builds.first()
 
 
-
 class Hook(db.Model):
     """Reflects GitHub hook."""
     id = db.Column(db.Integer, primary_key=True)
@@ -470,6 +469,11 @@ class Job(db.Model):
             description = 'Kozmic build #{0} has passed.'.format(self.build.number)
             self.build.set_status('success', description=description)
             return
+
+    @property
+    def tailer_url(self):
+        return flask.current_app.config['TAILER_URL_TEMPLATE'].format(
+            task_uuid=self.task_uuid)
 
     def is_finished(self):
         return self.status in ('success', 'failure', 'error')
