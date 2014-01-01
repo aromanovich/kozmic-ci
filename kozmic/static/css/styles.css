@@ -63,6 +63,11 @@ body {
   opacity: 0.5;
 }
 
+.badge-default {
+  background: white;
+  color: #999999;
+}
+
 .badge-danger {
   background: white;
   color: #d9534f;

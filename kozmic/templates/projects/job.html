@@ -34,6 +34,6 @@
       {% endif %}>{#
     #}{% if job.is_finished() -%}
       {{ job.stdout.decode('utf-8')|ansi2html|safe }}
-    {% endif %}{#
+    {%- endif %}{#
   #}</pre>
 {% endblock %}
