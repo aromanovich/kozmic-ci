@@ -270,6 +270,7 @@ class Project(db.Model):
         return builds.first()
 
 
+
 class Hook(db.Model):
     """Reflects GitHub hook."""
     id = db.Column(db.Integer, primary_key=True)
@@ -399,6 +400,10 @@ class Build(db.Model):
     def url(self):
         return flask.url_for(
             'projects.build', project_id=self.project.id, id=self.id)
+
+    def get_github_com_commit_url(self):
+        return ('https://github.com/{0.project.gh_full_name}/'
+                'commit/{0.gh_commit_sha}'.format(self))
 
 
 class Job(db.Model):

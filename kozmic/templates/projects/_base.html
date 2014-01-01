@@ -1,5 +1,7 @@
 {% extends '_base.html' %}
 
+{% from '_utils.html' import render_status %}
+
 {% block container %}
   <div class="row">
     <div class="col-md-3">
@@ -10,7 +12,7 @@
             <h4 class="list-group-item-heading">{{ project.gh_full_name }}</h4>
             Latest build:
             {% if latest_build %}
-              {{ latest_build.created_at }}
+              {{ render_status(latest_build.status, text=latest_build.created_at) }}
             {% else %}
               never
             {% endif %}
@@ -28,15 +30,9 @@
       ] -%}
       {% set extra_tabs = extra_tabs|default([]) -%}
       {% set active_tab = active_tab|default('latest-build') -%}
-      <h2 style="margin-top:0;">{{ project.gh_full_name }}</h2>
+      <h2 class="project-name">{{ project.gh_full_name }}</h2>
       <ul class="nav nav-tabs">
-        {% for href, id, caption in tabs %}
-          <li{% if id == active_tab %} class="active"{% endif %}>
-            <a href="{{ href|e }}">{{ caption|e }}</a>
-          </li>
-        {% endfor %}
-
-        {% for href, id, caption in extra_tabs %}
+        {% for href, id, caption in tabs + extra_tabs %}
           <li{% if id == active_tab %} class="active"{% endif %}>
             <a href="{{ href|e }}">{{ caption|e }}</a>
           </li>

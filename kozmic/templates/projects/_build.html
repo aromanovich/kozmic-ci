@@ -1,0 +1,75 @@
+{% extends 'projects/_base.html' %}
+
+{% from '_utils.html' import render_status %}
+
+{% if is_build_latest %}
+  {% set active_tab = 'latest-build' %}
+{% else %}
+  {% set active_tab = 'build' %}
+  {% set extra_tabs = [
+    (
+      url_for('.build', project_id=project.id, id=build.id),
+      'build',
+      'Build #{}'.format(build.id)
+    ),
+  ] -%}
+{% endif %}
+
+{% block extra_head %}
+  {{ render_ansi2html_style_tag()|safe }}
+{% endblock %}
+
+{% block content %}
+  <dl class="dl-horizontal">
+    <dt>#</dt>
+    <dd>{{ build.number }}</dd>
+    <dt>Status</dt>
+    <dd>{{ render_status(build.status) }}</dd>
+    <dt>Started at</dt>
+    <dd>{{ build.started_at or '—' }}</dd>
+    <dt>Finished at</dt>
+    <dd>{{ build.finished_at or '—' }}</dd>
+    <dt>Author</dt>
+    <dd>{{ build.gh_commit_author }}</dd>
+    <dt>Commit message</dt>
+    <dd>{{ build.gh_commit_message }}</dd>
+    <dt>Commit branch</dt>
+    <dd>{{ build.gh_commit_ref }}</dd>
+    <dt>Commit SHA</dt>
+    <dd>
+      <a href="{{ build.get_github_com_commit_url() }}">
+        {{ build.gh_commit_sha[:10] }}
+      </a>
+    </dd>
+  </dl>
+
+  <div>
+    <ul class="nav nav-tabs">
+      {% for job_ in build.jobs %}
+        <li{% if job_.id == job.id %} class="active"{% endif %}>
+          {% if job_.is_finished() %}
+            {% if job_.return_code == 0 %}
+              {% set status='success' %}
+            {% else %}
+              {% set status='failure' %}
+            {% endif %}
+          {% else %}
+            {% set status='pending' %}
+          {% endif %}
+          <a href="{{ url_for('.job', project_id=project.id, build_id=build.id, id=job_.id) }}">
+            "{{ job.hook_call.hook.title }}" job {{ render_status(status, text='●', type='badge') }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+    
+    {% block job_content %}
+    {% endblock %}
+  </div>
+
+  {% if build.status == 'enqueued' %}
+    <script>
+      setTimeout(function () { location.reload(true); }, 3000);
+    </script>
+  {% endif %}
+{% endblock %}

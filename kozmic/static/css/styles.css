@@ -38,9 +38,11 @@ body {
   height: 38px;
 }
 
+.job-log-wrapper {
+  margin-top: 5px;
+}
+
 .job-log {
-  max-height: 400px;
-  overflow: auto;
   border: none;
   background: #111;
   color: #f5f5f5;
@@ -59,4 +61,23 @@ body {
   width: 1.5em;
   text-align: right;
   opacity: 0.5;
+}
+
+.badge-danger {
+  background: white;
+  color: #d9534f;
+}
+
+.badge-success {
+  background: white;
+  color: #5cb85c;
+}
+
+.build-history.table th.commit-message,
+.build-history.table td.commit-message {
+  max-width: 200px;
+}
+
+.project-name {
+  margin-top: 0;
 }

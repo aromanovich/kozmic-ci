@@ -1,6 +1,6 @@
-{% macro render_status(status) %}
-  <span class="label label-{% if status == 'success' %}success{% elif status == 'failure' %}danger{% else %}default{% endif %}">
-    {{ status|capitalize }}
+{% macro render_status(status, text=None, type='label') %}
+<span class="{{ type }} {{ type }}-{% if status == 'success' %}success{% elif status == 'failure' %}danger{% else %}default{% endif %}">
+    {{ text or status|capitalize }}
   </span>
 {% endmacro %}
 

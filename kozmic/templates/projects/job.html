@@ -1,0 +1,72 @@
+{% extends 'projects/_build.html' %}
+
+{% block job_content %}
+  <dl class="dl-horizontal">
+    <dt>Started at</dt>
+    <dd>{{ job.started_at }}</dd>
+    <dt>Finished at</dt>
+    <dd>{{ job.finished_at }}</dd>
+    <dt>Return code</dt>
+    <dd>{{ job.return_code }}</dd>
+  </dl>
+
+  {% if job.is_finished() %}
+    <div class="clearfix">
+        <a href="{{ url_for('.job_log', project_id=project.id, id=job.id) }}"
+           class="btn btn-default pull-right">
+          <span class="glyphicon glyphicon-download-alt"></span>
+        </a>
+        <a href="{{ url_for('.job_restart', project_id=project.id, id=job.id) }}"
+           class="btn btn-default">
+          <span class="glyphicon glyphicon-refresh"></span> Restart
+        </a>
+    </div>
+  {% endif %}
+  
+  <div class="job-log-wrapper">
+    {% with id='job-{}-log'.format(job.id) %}
+      <pre id="{{ id }}" class="job-log">{{ (job.stdout and job.stdout.decode('utf-8') or '')|ansi2html|safe }}</pre>
+      <script language="javascript">
+        $(function() {
+            $('#{{ id }}').html(function(index, html) {
+                if (html != '') {
+                    return html.replace(/\n*$/, '').replace(/^(.*)$/mg, "<span class=\"line\">$1</span>");
+                }
+            });
+        });
+      </script>
+      {% if not job.is_finished() and job.task_uuid %}
+        <script language="javascript">
+            var s = new WebSocket(
+                '{{ tailer_url_template.format(task_uuid=job.task_uuid) }}');
+
+            s.onopen = function() {
+                console.debug('connected');
+            };
+
+            s.onmessage = function(message) {
+                var data = $.parseJSON(message.data)
+                if (data.type == 'message') {
+                    var log = $('#{{ id }}');
+                    $('body').scrollTop(log[0].scrollHeight + 30);
+                    if (data.content != '') {
+                        log[0].innerHTML += data.content.replace(/\n*$/, '').replace(
+                            /^(.*)$/mg, "<span class=\"line\">$1</span>") + '\n';
+                    }
+                } else if (data.type == 'status' && data.content == 'finished') {
+                    location.reload(true);
+                }
+            };
+            
+            s.onerror = function(e) {
+                console.error(e);
+            };
+
+            s.onclose = function(e) {
+                console.debug('closed');
+            };
+        </script>
+      {% endif %}
+    {% endwith %}
+  </div>
+{% endblock %}
