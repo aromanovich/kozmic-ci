@@ -1,9 +1,43 @@
 {% macro render_status(status, text=None, type='label') %}
-<span class="{{ type }} {{ type }}-{% if status == 'success' %}success{% elif status == 'failure' %}danger{% else %}default{% endif %}">
+  <span class="{{ type }} {{ type }}-{% if status == 'success' %}success{% elif status == 'failure' %}danger{% else %}default{% endif %}">
     {{ text or status|capitalize }}
   </span>
 {% endmacro %}
 
+
+{% macro render_pagination(pagination, endpoint, url_kwargs={}) %}
+  <ul class="pagination">
+    {% if pagination.has_prev %}
+      <li>
+        <a href="{{ url_for(endpoint, page=pagination.page - 1, **url_kwargs) }}">
+          &larr;
+        </a>
+      </li>
+    {% endif %}
+
+    {%- for page in pagination.iter_pages() %}
+      {% if page %}
+        <li {% if page == pagination.page %} class="active"{% endif %}>
+          <a href="{{ url_for(endpoint, page=page, **url_kwargs) }}">
+            {{ page }}
+          </a>
+        </li>
+      {% else %}
+        <li>
+          <span class="ellipsis">…</span>
+        </li>
+      {% endif %}
+    {%- endfor %}
+
+    {% if pagination.has_next %}
+      <li>
+        <a href="{{ url_for(endpoint, page=pagination.page + 1, **url_kwargs) }}">
+          &rarr;
+        </a>
+      </li>
+    {% endif %}
+  </ul>
+{% endmacro %}
 
 
 {% macro form_errors(form, hiddens=True) %}

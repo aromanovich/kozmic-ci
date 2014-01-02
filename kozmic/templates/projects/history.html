@@ -1,6 +1,6 @@
 {% extends 'projects/_base.html' %}
 
-{% from '_utils.html' import render_status %}
+{% from '_utils.html' import render_status, render_pagination %}
 
 {% set active_tab = 'build-history' %}
 
@@ -41,4 +41,7 @@
     {% endfor %}
   </tbody>
 </table>
+
+{{ render_pagination(pagination, endpoint=request.endpoint,
+                     url_kwargs=request.view_args.copy()) }}
 {% endblock %}

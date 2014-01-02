@@ -32,13 +32,18 @@ def show(id):
 @bp.route('/<int:id>/history/')
 def history(id):
     project = Project.query.get_or_404(id)
-    builds = project.builds.order_by(Build.id.desc()).all()
-    if not builds:
+    builds = project.builds.order_by(Build.id.desc())
+    if not builds.first():
         return redirect(url_for('.settings', id=id))
+
+    page = request.args.get('page', 1, type=int)
+    pagination = builds.paginate(page, per_page=50)
+
     return render_template(
         'projects/history.html',
         project=project,
-        builds=builds)
+        pagination=pagination,
+        builds=pagination.items)
 
 
 @bp.route('/<int:project_id>/builds/<id>/')
