@@ -63,6 +63,8 @@ def build(project_id, id):
         is_build_latest=(id == 'latest'),
         project=project,
         build=build,
+        permanent_job_url=url_for('.job', project_id=project.id,
+                                  build_id=build.id, id=job.id),
         job=job)
 
 
@@ -71,8 +73,6 @@ def job(project_id, build_id, id):
     project = Project.query.get_or_404(project_id)
     build = project.builds.filter_by(id=build_id).first_or_404()
     job = build.jobs.filter_by(id=id).first_or_404()
-
-    print type(job.stdout), '!'
 
     return render_template(
         'projects/job.html',

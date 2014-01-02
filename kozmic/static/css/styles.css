@@ -45,7 +45,7 @@ body {
 .job-log {
   border: none;
   background: #111;
-  color: #f5f5f5;
+  color: #eee;
   font-size: 12px;
   counter-reset: line-numbering;
   font-family: Menlo, Monaco, monospace;
@@ -53,15 +53,31 @@ body {
   word-break: break-word;
 }
 
-.job-log .line::before {
-  content: counter(line-numbering);
-  counter-increment: line-numbering;
-  padding-right: 1em;
-  /* space after numbers */
-  width: 1.5em;
-  text-align: right;
-  opacity: 0.5;
-}
+  .job-log .line {
+    display: inline-block;
+    width: 100%;
+  }
+
+    .job-log .line:hover {
+      background: #444;
+    }
+
+  .job-log .line .number {
+    color: #777;
+    padding-right: 1em;
+    width: 4em;
+    text-align: right;
+    display: inline-block;
+    font-size: 11px;
+  }
+
+    .job-log .line .number:hover {
+      text-decoration: underline;
+    }
+
+    .job-log .line:target .number {
+      color: #fff;
+    }
 
 .badge-default {
   background: white;

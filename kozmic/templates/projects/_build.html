@@ -16,7 +16,13 @@
 {% endif %}
 
 {% block extra_head %}
+  {{ super() }}
   {{ render_ansi2html_style_tag()|safe }}
+  {% if permanent_job_url %}
+    {# Specify base href so that line number links (which are relative) points to
+    the permanent job URL. #}
+    <base href="{{ permanent_job_url }}">
+  {% endif %}
 {% endblock %}
 
 {% block content %}
