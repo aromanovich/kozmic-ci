@@ -317,16 +317,14 @@ def restart_job(id):
     build_id = job.build_id
     hook_call_id = job.hook_call_id
     db.session.delete(job)
-    do_build.apply(args=(build_id, hook_call_id))
+    do_build.apply(args=(hook_call_id,))
 
 
 @celery.task
-def do_build(build_id, hook_call_id):
+def do_build(hook_call_id):
     hook_call = HookCall.query.get(hook_call_id)
     assert hook_call, 'HookCall#{} does not exist.'.format(hook_call_id)
-
-    build = Build.query.get(build_id)
-    assert build, 'Build#{} does not exist.'.format(build_id)
+    build = hook_call.build
 
     job = Job(
         build=build,

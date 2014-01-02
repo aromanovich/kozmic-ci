@@ -230,8 +230,12 @@ class TestHookDB(TestCase):
         """Tests that hook calls are preserved on hook delete."""
         user = factories.UserFactory.create()
         project = factories.ProjectFactory.create(owner=user)
+        builds = factories.BuildFactory.create_batch(3, project=project)
         hook = factories.HookFactory.create(project=project)
-        hook_calls = factories.HookCallFactory.create_batch(3, hook=hook)
+        hook_calls = []
+        for build in builds:
+            hook_calls.append(
+                factories.HookCallFactory.create(hook=hook, build=build))
 
         for hook_call in hook_calls:
             assert hook_call.hook_id == hook.id
@@ -435,8 +439,9 @@ class TestBuildTask(TestCase):
         self.user = factories.UserFactory.create()
         self.project = factories.ProjectFactory.create(owner=self.user)
         self.hook = factories.HookFactory.create(project=self.project)
-        self.hook_call = factories.HookCallFactory.create(hook=self.hook)
         self.build = factories.BuildFactory.create(project=self.project)
+        self.hook_call = factories.HookCallFactory.create(
+            hook=self.hook, build=self.build)
 
     def test_do_build(self):
         with SessionScope(self.db):
@@ -451,8 +456,7 @@ class TestBuildTask(TestCase):
             tailer_patcher.start()
             docker_patcher.start()
             try:
-                kozmic.builds.tasks.do_build(build_id=self.build.id,
-                                             hook_call_id=self.hook_call.id)
+                kozmic.builds.tasks.do_build(hook_call_id=self.hook_call.id)
             finally:
                 docker_patcher.stop()
                 tailer_patcher.stop()

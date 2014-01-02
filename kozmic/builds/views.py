@@ -1,6 +1,7 @@
 import json
 
 import github3
+import sqlalchemy
 from flask import request, redirect, url_for
 
 from kozmic import db, csrf
@@ -40,9 +41,6 @@ def hook(id):
     ref, sha = ref_and_sha
 
     hook = Hook.query.get_or_404(id)
-    hook_call = HookCall(gh_payload=payload)
-    hook.calls.append(hook_call)
-
     gh_commit = hook.project.gh.git_commit(sha)
 
     build = hook.project.builds.filter(
@@ -59,10 +57,27 @@ def hook(id):
             gh_commit_message=gh_commit.message)
         build.calculate_number()
         db.session.add(build)
-        db.session.commit()
-        tasks.do_build.delay(build_id=build.id, hook_call_id=hook_call.id)
 
-    return 'Thanks'
+    hook_call = HookCall(
+        hook=hook,
+        build=build,
+        gh_payload=payload)
+    db.session.add(hook_call)
+    try:
+        db.session.commit()
+    except sqlalchemy.exc.IntegrityError:
+        # Commit may fail due to "unique_ref_and_sha_within_project"
+        # constraint on Build or "unique_hook_call_within_build" on
+        # HookCall. It means that GitHub called this hook twice
+        # (push and pull request sync events) at the same time and
+        # Build and HookCall has been just committed by another
+        # transaction.
+        db.session.rollback()
+        return 'OK'
+
+    tasks.do_build.delay(hook_call_id=hook_call.id)
+
+    return 'OK'
 
 
 @bp.route('/badges/<gh_login>/<gh_name>/<ref>')

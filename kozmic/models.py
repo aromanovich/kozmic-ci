@@ -280,7 +280,7 @@ class Hook(db.Model):
     gh_id = db.Column(db.Integer, nullable=False)
     #: Title
     title = db.Column(db.String(200), nullable=False)
-    #: Bash one-liner to be run at hook call
+    #: Script to be run at hook call
     build_script = db.Column(db.Text, nullable=False)
     #: Name of a docker image to run build script in
     #: (for example, "ubuntu" or "aromanovich/ubuntu-kozmic").
@@ -288,20 +288,6 @@ class Hook(db.Model):
     docker_image = db.Column(db.String(200), nullable=False)
     #: Project
     project = db.relationship(Project, backref=db.backref('hooks', lazy='dynamic'))
-
-
-class HookCall(db.Model):
-    """Reflects a fact that GitHub triggered a project hook."""
-    id = db.Column(db.Integer, primary_key=True)
-    hook_id = db.Column(db.Integer, db.ForeignKey('hook.id', ondelete='SET NULL'))
-
-    #: Created at
-    created_at = db.Column(db.DateTime, nullable=False,
-                           default=datetime.datetime.utcnow)
-    #: Pickled JSON payload from a GitHub request
-    gh_payload = db.deferred(db.Column(db.PickleType, nullable=False))
-    #: Hook
-    hook = db.relationship(Hook, backref=db.backref('calls', lazy='dynamic'))
 
 
 class Build(db.Model):
@@ -403,6 +389,28 @@ class Build(db.Model):
     def get_github_com_commit_url(self):
         return ('https://github.com/{0.project.gh_full_name}/'
                 'commit/{0.gh_commit_sha}'.format(self))
+
+
+class HookCall(db.Model):
+    """Reflects a fact that GitHub triggered a project hook."""
+    __table_args__ = (
+        db.UniqueConstraint('build_id', 'hook_id',
+                            name='unique_hook_call_within_build'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    hook_id = db.Column(db.Integer, db.ForeignKey('hook.id', ondelete='SET NULL'))
+    build_id = db.Column(db.Integer, db.ForeignKey('build.id'), nullable=False)
+
+    #: Created at
+    created_at = db.Column(db.DateTime, nullable=False,
+                           default=datetime.datetime.utcnow)
+    #: Pickled JSON payload from a GitHub request
+    gh_payload = db.deferred(db.Column(db.PickleType, nullable=False))
+    #: Hook
+    hook = db.relationship(Hook, backref=db.backref('calls', lazy='dynamic'))
+    #: Build
+    build = db.relationship(Build, backref=db.backref('hook_calls', lazy='dynamic'))
 
 
 class Job(db.Model):

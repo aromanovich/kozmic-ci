@@ -383,7 +383,8 @@ class TestGitHubHooks(TestCase):
 
         self.user = factories.UserFactory.create()
         self.project = factories.ProjectFactory.create(owner=self.user)
-        self.hook = factories.HookFactory.create(project=self.project)
+        self.hook_1 = factories.HookFactory.create(project=self.project)
+        self.hook_2 = factories.HookFactory.create(project=self.project)
 
     def _create_gh_repo_mock(self, commit_data):
         gh_repo_mock = mock.Mock()
@@ -400,18 +401,18 @@ class TestGitHubHooks(TestCase):
         with mock.patch.object(Project, 'gh', gh_repo_mock):
             with mock.patch('kozmic.builds.tasks.do_build') as do_build_mock:
                 r = self.w.post_json(
-                    url_for('builds.hook', id=self.hook.id, _external=True),
+                    url_for('builds.hook', id=self.hook_1.id, _external=True),
                     fixtures.PULL_REQUEST_HOOK_CALL_DATA)
 
         assert r.status_code == 200
-        assert r.body == 'Thanks'
+        assert r.body == 'OK'
 
         gh_repo_mock.git_commit.assert_called_once_with(head_sha)
 
-        assert self.hook.calls.count() == 1
+        assert self.hook_1.calls.count() == 1
         assert self.project.builds.count() == 1
 
-        hook_call = self.hook.calls.first()
+        hook_call = self.hook_1.calls.first()
 
         build = self.project.builds.first()
         assert self.project.builds.count() == 1
@@ -422,8 +423,7 @@ class TestGitHubHooks(TestCase):
         assert build.gh_commit_message == commit_data['message']
         assert build.gh_commit_author == commit_data['author']['name']
 
-        do_build_mock.delay.assert_called_once_with(
-            build_id=build.id, hook_call_id=hook_call.id)
+        do_build_mock.delay.assert_called_once_with(hook_call_id=hook_call.id)
 
     def test_consecutive_hook_calls(self):
         commit_data = fixtures.COMMIT_47fe2_DATA
@@ -436,23 +436,26 @@ class TestGitHubHooks(TestCase):
                 fixtures.PULL_REQUEST_HOOK_CALL_DATA['pull_request']['head']['ref'])
 
             with mock.patch('kozmic.builds.tasks.do_build') as do_build_mock:
-                r = self.w.post_json(
-                    url_for('builds.hook', id=self.hook.id, _external=True),
-                    push_hook_call_data)
-                r = self.w.post_json(
-                    url_for('builds.hook', id=self.hook.id, _external=True),
+                for hook in (self.hook_1, self.hook_2):
+                    self.w.post_json(
+                        url_for('builds.hook', id=hook.id, _external=True),
+                        push_hook_call_data)
+                self.w.post_json(
+                    url_for('builds.hook', id=self.hook_1.id, _external=True),
                     fixtures.PULL_REQUEST_HOOK_CALL_DATA)
 
         build = self.project.builds.first()
-        hook_call = self.hook.calls.first()
+        hook_call = self.hook_1.calls.first()
 
         assert self.project.builds.count() == 1
-        assert self.hook.calls.count() == 1
+        assert self.hook_1.calls.count() == 1
+        assert self.hook_2.calls.count() == 1
         assert build.number == 1  # Make sure that second hook call hasn't
                                   # increased build number
-        # And `do_build` was called only once
-        do_build_mock.delay.assert_called_once_with(
-            build_id=build.id, hook_call_id=hook_call.id)
+        assert do_build_mock.delay.call_args_list == [
+            mock.call(hook_call_id=self.hook_1.id),
+            mock.call(hook_call_id=self.hook_2.id),
+        ]
 
 
 class TestBadges(TestCase):
@@ -479,7 +482,7 @@ class TestBadges(TestCase):
         r = self.w.get('/badges/aromanovich/flask-webtest/master')
         assert r.status_code == 307
         assert r.location == 'https://kozmic.test/static/img/badges/success.png'
-        
+
         # feature-branch is "failure"
         r = self.w.get('/badges/aromanovich/flask-webtest/feature-branch')
         assert r.status_code == 307
@@ -492,9 +495,10 @@ class TestBuilds(TestCase):
 
         self.user = factories.UserFactory.create()
         self.project = factories.ProjectFactory.create(owner=self.user)
-        self.hook = factories.HookFactory.create(project=self.project)
-        self.hook_call = factories.HookCallFactory.create(hook=self.hook)
         self.build = factories.BuildFactory.create(project=self.project)
+        self.hook = factories.HookFactory.create(project=self.project)
+        self.hook_call = factories.HookCallFactory.create(
+            hook=self.hook, build=self.build)
 
     def test_basics(self):
         self.job = factories.JobFactory.create(
