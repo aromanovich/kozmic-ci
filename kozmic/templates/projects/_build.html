@@ -54,7 +54,7 @@
       {% for job_ in build.jobs %}
         <li{% if job_.id == job.id %} class="active"{% endif %}>
           <a href="{{ url_for('.job', project_id=project.id, build_id=build.id, id=job_.id) }}">
-            "{{ job.hook_call.hook.title }}" job {{ render_status(job_.status, text='●', type='badge') }}
+            "{{ job_.hook_call.hook.title }}" job {{ render_status(job_.status, text='●', type='badge') }}
           </a>
         </li>
       {% endfor %}
