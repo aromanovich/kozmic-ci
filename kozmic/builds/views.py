@@ -37,7 +37,7 @@ def hook(id):
     payload = json.loads(request.data)
     ref_and_sha = get_ref_and_sha(payload)
     if not ref_and_sha:
-        return 'Not interested, thanks'
+        return 'OK'
     ref, sha = ref_and_sha
 
     hook = Hook.query.get_or_404(id)
@@ -63,20 +63,20 @@ def hook(id):
         build=build,
         gh_payload=payload)
     db.session.add(hook_call)
+
     try:
         db.session.commit()
     except sqlalchemy.exc.IntegrityError:
         # Commit may fail due to "unique_ref_and_sha_within_project"
         # constraint on Build or "unique_hook_call_within_build" on
         # HookCall. It means that GitHub called this hook twice
-        # (push and pull request sync events) at the same time and
-        # Build and HookCall has been just committed by another
-        # transaction.
+        # (for example, on push and pull request sync events)
+        # at the same time and Build and HookCall has been just
+        # committed by another transaction.
         db.session.rollback()
         return 'OK'
 
-    tasks.do_build.delay(hook_call_id=hook_call.id)
-
+    tasks.do_job.delay(hook_call_id=hook_call.id)
     return 'OK'
 
 

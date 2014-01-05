@@ -23,26 +23,39 @@ def setup(session):
 
 
 def reset():
-    BuildFactory.reset_sequence()
-    ProjectFactory.reset_sequence()
-    UserFactory.reset_sequence()
+    factories = (
+        BuildFactory,
+        ProjectFactory,
+        UserFactory,
+        UserRepositoryFactory,
+        OrganizationFactory,
+        OrganizationRepositoryFactory,
+        JobFactory,
+        HookFactory,
+        HookCallFactory,
+    )
+    for factory in factories:
+        factory.reset_sequence()
+
+
+_identity = lambda n: n
 
 
 class UserFactory(Factory):
     FACTORY_FOR = User
 
-    id = factory.Sequence(lambda n: n)
-    gh_id = factory.Sequence(lambda n: n)
-    gh_name = factory.Sequence(lambda n: u'User %d' % n)
-    gh_login = factory.Sequence(lambda n: u'user_%d' % n)
-    gh_avatar_url = factory.Sequence(lambda n: u'http://example.com/%d.png' % n)
+    id = factory.Sequence(_identity)
+    gh_id = factory.Sequence(_identity)
+    gh_name = factory.Sequence(u'User {}'.format)
+    gh_login = factory.Sequence(u'user_{}'.format)
+    gh_avatar_url = factory.Sequence(u'http://example.com/{}.png'.format)
     gh_access_token = 'token'
 
 
 class UserRepositoryFactory(Factory):
     FACTORY_FOR = User.Repository
 
-    id = factory.Sequence(lambda n: n)
+    id = factory.Sequence(_identity)
     gh_id = factory.Sequence(lambda n: 1000 + n)
     gh_name = 'django'
     gh_full_name = 'johndoe/django'
@@ -55,8 +68,8 @@ class UserRepositoryFactory(Factory):
 class OrganizationFactory(Factory):
     FACTORY_FOR = Organization
 
-    id = factory.Sequence(lambda n: n)
-    gh_id = factory.Sequence(lambda n: n)
+    id = factory.Sequence(_identity)
+    gh_id = factory.Sequence(_identity)
     gh_login = 'pyconru'
     gh_name = 'PyCon Russia'
 
@@ -77,21 +90,21 @@ class OrganizationRepositoryFactory(Factory):
 class ProjectFactory(Factory):
     FACTORY_FOR = Project
 
-    id = factory.Sequence(lambda n: n)
-    gh_id = factory.Sequence(lambda n: n)
-    gh_name = factory.Sequence(lambda n: u'project_%d' % n)
-    gh_full_name = factory.Sequence(lambda n: u'Project %d' % n)
-    gh_login = factory.Sequence(lambda n: u'project_%d' % n)
-    gh_clone_url = factory.Sequence(lambda n: u'git://example.com/%d.git' % n)
-    gh_key_id = factory.Sequence(lambda n: n)
-    rsa_public_key = factory.Sequence(lambda n: str(n))
+    id = factory.Sequence(_identity)
+    gh_id = factory.Sequence(_identity)
+    gh_name = factory.Sequence(u'project_{}'.format)
+    gh_full_name = factory.Sequence(u'Project {}'.format)
+    gh_login = factory.Sequence(u'project_{}'.format)
+    gh_clone_url = factory.Sequence(u'git://example.com/%d.git'.format)
+    gh_key_id = factory.Sequence(_identity)
+    rsa_public_key = factory.Sequence(str)
     rsa_private_key = factory.Sequence(lambda n: str(n) + '.pub')
 
 
 class BuildFactory(Factory):
     FACTORY_FOR = Build
 
-    id = factory.Sequence(lambda n: n)
+    id = factory.Sequence(_identity)
     gh_commit_author = 'aromanovich'
     gh_commit_message = 'ok'
     gh_commit_ref = 'master'
@@ -117,15 +130,15 @@ class BuildFactory(Factory):
 class JobFactory(Factory):
     FACTORY_FOR = Job
 
-    id = factory.Sequence(lambda n: n)
+    id = factory.Sequence(_identity)
 
 
 class HookFactory(Factory):
     FACTORY_FOR = Hook
 
-    id = factory.Sequence(lambda n: n)
-    gh_id = factory.Sequence(lambda n: n)
-    title = factory.Sequence(lambda n: u'Hook %d' % n)
+    id = factory.Sequence(_identity)
+    gh_id = factory.Sequence(_identity)
+    title = factory.Sequence(u'Hook {}'.format)
     build_script = './kozmic.sh'
     docker_image = 'ubuntu'
 
@@ -133,7 +146,7 @@ class HookFactory(Factory):
 class HookCallFactory(Factory):
     FACTORY_FOR = HookCall
 
-    id = factory.Sequence(lambda n: n)
+    id = factory.Sequence(_identity)
 
     @factory.lazy_attribute
     def gh_payload(self):

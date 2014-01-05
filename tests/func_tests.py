@@ -399,7 +399,7 @@ class TestGitHubHooks(TestCase):
         head_sha = commit_data['sha']
 
         with mock.patch.object(Project, 'gh', gh_repo_mock):
-            with mock.patch('kozmic.builds.tasks.do_build') as do_build_mock:
+            with mock.patch('kozmic.builds.tasks.do_job') as do_job_mock:
                 r = self.w.post_json(
                     url_for('builds.hook', id=self.hook_1.id, _external=True),
                     fixtures.PULL_REQUEST_HOOK_CALL_DATA)
@@ -423,7 +423,7 @@ class TestGitHubHooks(TestCase):
         assert build.gh_commit_message == commit_data['message']
         assert build.gh_commit_author == commit_data['author']['name']
 
-        do_build_mock.delay.assert_called_once_with(hook_call_id=hook_call.id)
+        do_job_mock.delay.assert_called_once_with(hook_call_id=hook_call.id)
 
     def test_consecutive_hook_calls(self):
         commit_data = fixtures.COMMIT_47fe2_DATA
@@ -435,7 +435,7 @@ class TestGitHubHooks(TestCase):
             push_hook_call_data['ref'] = 'refs/heads/{}'.format(
                 fixtures.PULL_REQUEST_HOOK_CALL_DATA['pull_request']['head']['ref'])
 
-            with mock.patch('kozmic.builds.tasks.do_build') as do_build_mock:
+            with mock.patch('kozmic.builds.tasks.do_job') as do_job_mock:
                 for hook in (self.hook_1, self.hook_2):
                     self.w.post_json(
                         url_for('builds.hook', id=hook.id, _external=True),
@@ -445,17 +445,17 @@ class TestGitHubHooks(TestCase):
                     fixtures.PULL_REQUEST_HOOK_CALL_DATA)
 
         build = self.project.builds.first()
-        hook_call = self.hook_1.calls.first()
+        hook_call_1 = self.hook_1.calls.first()
+        hook_call_2 = self.hook_2.calls.first()
 
         assert self.project.builds.count() == 1
         assert self.hook_1.calls.count() == 1
         assert self.hook_2.calls.count() == 1
         assert build.number == 1  # Make sure that second hook call hasn't
                                   # increased build number
-        assert do_build_mock.delay.call_args_list == [
-            mock.call(hook_call_id=self.hook_1.id),
-            mock.call(hook_call_id=self.hook_2.id),
-        ]
+        assert do_job_mock.delay.call_count == 2
+        assert mock.call(hook_call_id=hook_call_1.id) in do_job_mock.delay.call_args_list
+        assert mock.call(hook_call_id=hook_call_2.id) in do_job_mock.delay.call_args_list
 
 
 class TestBadges(TestCase):

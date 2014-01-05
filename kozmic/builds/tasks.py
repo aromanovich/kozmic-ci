@@ -235,7 +235,7 @@ class Builder(threading.Thread):
         logger.info('Builder has finished.')
 
 
-def _do_build(task_request, hook, build, task_uuid):
+def _do_job(task_request, hook, build, task_uuid):
     config = current_app.config
     redis_client = redis.StrictRedis(host=config['KOZMIC_REDIS_HOST'],
                                      port=config['KOZMIC_REDIS_PORT'],
@@ -319,26 +319,26 @@ def restart_job(id):
     build_id = job.build_id
     hook_call_id = job.hook_call_id
     db.session.delete(job)
-    do_build.apply(args=(hook_call_id,))
+    do_job.apply(args=(hook_call_id,))
 
 
 @celery.task
-def do_build(hook_call_id):
+def do_job(hook_call_id):
     hook_call = HookCall.query.get(hook_call_id)
     assert hook_call, 'HookCall#{} does not exist.'.format(hook_call_id)
-    build = hook_call.build
 
+    build = hook_call.build
     job = Job(
         build=build,
         hook_call=hook_call,
-        task_uuid=do_build.request.id)
+        task_uuid=do_job.request.id)
     db.session.add(job)
 
     job.started()
     db.session.commit()
 
-    return_code, exc_info, stdout = _do_build(
-        do_build.request, hook_call.hook, build, job.task_uuid)
+    return_code, exc_info, stdout = _do_job(
+        do_job.request, hook_call.hook, build, job.task_uuid)
 
     if exc_info:
         job.finished(1)

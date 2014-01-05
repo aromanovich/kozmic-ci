@@ -443,7 +443,7 @@ class TestBuildTask(TestCase):
         self.hook_call = factories.HookCallFactory.create(
             hook=self.hook, build=self.build)
 
-    def test_do_build(self):
+    def test_do_job(self):
         with SessionScope(self.db):
             set_status_patcher = mock.patch.object(Build, 'set_status')
             builder_patcher = mock.patch('kozmic.builds.tasks.Builder', new=BuilderStub)
@@ -456,7 +456,7 @@ class TestBuildTask(TestCase):
             tailer_patcher.start()
             docker_patcher.start()
             try:
-                kozmic.builds.tasks.do_build(hook_call_id=self.hook_call.id)
+                kozmic.builds.tasks.do_job(hook_call_id=self.hook_call.id)
             finally:
                 docker_patcher.stop()
                 tailer_patcher.stop()
@@ -491,20 +491,20 @@ class TestBuildTask(TestCase):
 
         with SessionScope(self.db):
             set_status_patcher = mock.patch.object(Build, 'set_status')
-            _do_build_patcher = mock.patch('kozmic.builds.tasks._do_build',
-                                           return_value=(0, None, 'output'))
+            _do_job_patcher = mock.patch('kozmic.builds.tasks._do_job',
+                                         return_value=(0, None, 'output'))
 
             set_status_mock = set_status_patcher.start()
-            _do_build_mock = _do_build_patcher.start()
+            _do_job_mock = _do_job_patcher.start()
             try:
                 kozmic.builds.tasks.restart_job(job.id)
             finally:
-                _do_build_mock.stop()
+                _do_job_mock.stop()
                 set_status_patcher.stop()
         self.db.session.rollback()
 
         assert self.build.jobs.count() == 1
-        assert _do_build_mock.called
+        assert _do_job_mock.called
 
         job = self.build.jobs.first()
         assert job_id_before_restart != job.id
