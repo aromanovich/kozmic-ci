@@ -226,7 +226,9 @@ class Builder(threading.Thread):
         logger.info('Docker process %s has started.', container)
 
         self.return_code = client.wait(container)
-        logger.info(client.logs(container))
+        logger.info('Docker process log: %s', client.logs(container))
+        client.remove_container(container)
+
         logger.info('Docker process %s has finished with return code %i.',
                     container, self.return_code)
 
