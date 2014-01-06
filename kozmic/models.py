@@ -154,7 +154,7 @@ class User(HasRepositories, db.Model, UserMixin):
         gh_orgs = set()
         gh_repos_by_org_id = collections.defaultdict(list)
 
-        for gh_team in self.gh.iter_teams():
+        for gh_team in self.gh.iter_user_teams():
             if gh_team.permission != 'admin':
                 continue
 

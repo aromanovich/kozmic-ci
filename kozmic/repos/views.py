@@ -10,25 +10,6 @@ from kozmic.models import User, Organization, Project
 from . import bp
 
 
-# TODO Make a pull request
-# Monkeypatch GitHub library
-def iter_teams(self, type=None, sort=None, direction=None,
-               number=-1, etag=None):
-    url = self._build_url('user', 'teams')
-
-    params = {}
-    if type in ('all', 'owner', 'member'):
-        params.update(type=type)
-    if sort in ('created', 'updated', 'pushed', 'full_name'):
-        params.update(sort=sort)
-    if direction in ('asc', 'desc'):
-        params.update(direction=direction)
-
-    return self._iter(int(number), url, github3.orgs.Team, params, etag)
-github3.github.GitHub.iter_teams = iter_teams
-# / TODO
-
-
 @bp.route('/')
 def index():
     existing_projects = dict(current_user.projects.with_entities(
