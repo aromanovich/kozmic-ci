@@ -117,7 +117,7 @@ def settings(id):
         fqdn=current_app.config['SERVER_NAME'])
 
 
-@bp.route('/<int:project_id>/hooks/add/', methods=['GET', 'POST'])
+@bp.route('/<int:project_id>/hooks/add/', methods=('GET', 'POST'))
 def add_hook(project_id):
     project = Project.query.get_or_404(project_id)
 
@@ -160,12 +160,18 @@ def add_hook(project_id):
             'projects/add-hook.html', project=project, form=form)
 
 
-@bp.route('/<int:project_id>/hooks/<int:hook_id>/edit/', methods=['GET', 'POST'])
+@bp.route('/<int:project_id>/hooks/<int:hook_id>/edit/', methods=('GET', 'POST'))
 def edit_hook(project_id, hook_id):
     project = Project.query.get_or_404(project_id)
     hook = project.hooks.filter_by(id=hook_id).first_or_404()
 
-    form = HookForm(request.form, obj=hook)
+    form_kwargs = {}
+    if 'build_script' in request.form:
+        # Convert Windows line endings to Unix:
+        form_kwargs['build_script'] = '\n'.join(
+            request.form['build_script'].splitlines())
+
+    form = HookForm(request.form, obj=hook, **form_kwargs)
     if form.validate_on_submit():
         form.populate_obj(hook)
         db.session.add(hook)
@@ -176,7 +182,7 @@ def edit_hook(project_id, hook_id):
             'projects/edit-hook.html', project=project, form=form)
 
 
-@bp.route('/<int:project_id>/hooks/<int:hook_id>/delete/', methods=['POST'])
+@bp.route('/<int:project_id>/hooks/<int:hook_id>/delete/', methods=('POST',))
 def delete_hook(project_id, hook_id):
     project = Project.query.get_or_404(project_id)
     hook = project.hooks.filter_by(id=hook_id).first_or_404()
@@ -224,7 +230,7 @@ def add_member(project_id):
         'projects/add-member.html', project=project, form=form)
 
 
-@bp.route('/<int:project_id>/members/<int:user_id>/delete/', methods=['GET', 'POST'])
+@bp.route('/<int:project_id>/members/<int:user_id>/delete/', methods=('GET', 'POST'))
 def delete_member(project_id, user_id):
     project = Project.query.get_or_404(project_id)
     user = project.members.filter_by(id=user_id).first_or_404()

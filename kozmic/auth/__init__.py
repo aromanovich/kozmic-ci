@@ -1,4 +1,12 @@
 # coding: utf-8
+"""
+kozmic.auth
+~~~~~~~~~~~
+
+.. attribute:: bp
+
+    :class:`flask.Blueprint` that implements an authentication through GitHub.
+"""
 import certifi
 from flask import Blueprint, redirect, url_for
 from flask.ext.oauth import OAuth
@@ -57,8 +65,8 @@ def init_github_oauth_app(github_client_id, github_client_secret):
     # See http://stackoverflow.com/a/10393381 for details
     github_oauth_app._client.ca_certs = certifi.where()
 
-    # Store OAuth app in the blueprint object to make it available
-    # to the views
+    # Store OAuth app at the blueprint object to make it available
+    # to the view functions
     bp.github_oauth_app = github_oauth_app
 
 

@@ -72,7 +72,7 @@ def sync():
     return redirect(url_for('.index'))
 
 
-@bp.route('/<int:gh_id>/on/', methods=['POST'])
+@bp.route('/<int:gh_id>/on/', methods=('POST',))
 def on(gh_id):
     """Creates :class:`app.models.Project` for GitHub repository
     with `gh_id`.
@@ -106,16 +106,16 @@ def on(gh_id):
         gh_full_name=repo.gh_full_name,
         gh_login=repo.parent.gh_login,
         gh_clone_url=repo.gh_clone_url,
-        gh_key_id=-1)  # Just some integer to avoid integrity error
+        gh_key_id=-1)  # -1 is just some integer to avoid integrity error
 
     rsa_key = RSA.generate(2048)
     project.rsa_private_key = rsa_key.exportKey(
         format='PEM', passphrase=project.passphrase)
     project.rsa_public_key = rsa_key.publickey().exportKey(format='OpenSSH')
-    
+
     db.session.add(project)
     db.session.flush()
-        
+
     try:
         gh_key = project.gh.create_key('Kozmic CI', project.rsa_public_key)
         project.gh_key_id = gh_key.id

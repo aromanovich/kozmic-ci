@@ -1,3 +1,11 @@
+# coding: utf-8
+"""
+kozmic.builds.tasks
+~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: do_job(hook_call_id)
+.. autofunction:: restart_job(id)
+"""
 import os
 import sys
 import time
@@ -35,6 +43,33 @@ def create_temp_dir():
 
 
 class Tailer(threading.Thread):
+    """A daemon thread that watches for additional lines to be appended to a
+    specified log file.
+    Once there is a new line, it translates ANSI sequences to HTML tags and:
+
+    1. Sends the line to a Redis pub/sub channel;
+    2. Pushes it to Redis list of the same name.
+
+    If the log does not change for ``kill_timeout`` seconds, specified Docker
+    container will be killed and corresponding message will be published
+    to the log.
+
+    :param log_path: path to the log file to watch
+    :type log_path: str
+
+    :param redis_client: Redis client
+    :type log_path: redis.Redis
+
+    :param channel: pub/sub channel name
+    :type channel: str
+
+    :param container: container to kill
+    :type сontainer: dictionary returned by :meth:`docker.Client.create_container`
+
+    :param kill_timeout: number of seconds since the last log append after
+                         which kill the container
+    :type kill_timeout: int
+    """
     daemon = True
 
     def __init__(self, log_path, redis_client, channel, container, kill_timeout=600):
@@ -46,6 +81,7 @@ class Tailer(threading.Thread):
         self._container = container
         self._kill_timeout = kill_timeout
         self._ansi_converter = get_ansi_to_html_converter()
+        self._read_timeout = 0.5
 
     def stop(self):
         self._stop.set()
@@ -76,22 +112,21 @@ class Tailer(threading.Thread):
             fcntl.fcntl(tailf.stdout, fcntl.F_SETFL, fl | os.O_NONBLOCK)
 
             buf = ''
-            read_timeout = 0.5
             iterations_without_read = 0
             while True:
                 if self.is_stopped():
                     break
-                reads, _, _ = select.select([tailf.stdout], [], [], read_timeout)
+                reads, _, _ = select.select([tailf.stdout], [], [], self._read_timeout)
                 if not reads:
                     iterations_without_read += 1
-                    if iterations_without_read * read_timeout > self._kill_timeout:
-                        message = 'Sorry, your build has stalled and been killed.\n'
-                        with open(self._log_path, 'a') as log:
-                            log.write(message)
-                        self._publish([message])
-                        self._kill_container()
-                        return
-                    continue
+                    if iterations_without_read * self._read_timeout < self._kill_timeout:
+                        continue
+                    message = 'Sorry, your build has stalled and been killed.\n'
+                    with open(self._log_path, 'a') as log:
+                        log.write(message)
+                    self._publish([message])
+                    self._kill_container()
+                    return
                 else:
                     iterations_without_read = 0
 
@@ -140,7 +175,7 @@ SSH_ASKPASS=/kozmic/askpass.sh DISPLAY=:0.0 nohup ssh-add /kozmic/id_rsa
 rm /kozmic/askpass.sh /kozmic/id_rsa
 
 git clone {clone_url} /kozmic/src
-cd /kozmic/src && git checkout -q {sha}
+cd /kozmic/src && git checkout -q {commit_sha}
 
 groupadd -f admin
 useradd -m -d /home/kozmic -G admin -s /bin/bash kozmic
@@ -162,23 +197,66 @@ echo {passphrase}
 
 
 class Builder(threading.Thread):
-    def __init__(self, rsa_private_key, passphrase, docker_image,
-                 shell_code, build_dir, clone_url, sha, container_queue):
+    """A thread that starts build script in a container and waits
+    for it to complete.
+
+    One of the following attributes is not ``None`` once
+    the thread has finished:
+
+    .. attribute:: return_code
+
+        Integer, a build script's return code if everything went well.
+
+    .. attribute:: exc_info
+
+        ``exc_info`` triple ``(type, value, traceback)``
+        if something went wrong.
+
+    :param message_queue: a queue to which put an identifier of the started
+                          Docker container. Identifier is a dictionary returned
+                          by :meth:`docker.Client.create_container`.
+                          Builder will block until the message is acknowledged
+                          by calling :meth:`Queue.Queue.task_done`.
+    :type message_queue: :class:`Queue.Queue`
+
+    :param rsa_private_key: deploy private key
+    :type rsa_private_key: str
+
+    :param passphrase: passphrase for :attr:`rsa_private_key`
+    :type passphrase: str
+
+    :param docker_image: a name of Docker image to be used for
+                         :attr:`build_script` execution. The image
+                         has to be already pulled from the registry.
+    :type docker_image: str
+
+    :param build_dir: path of the directory to be mounted in container's
+                      `/kozmic` path
+    :type build_dir: str
+
+    :param clone_url: SSH clone URL
+    :type clone_url: str
+
+    :param commit_sha: SHA of the commit to be checked out
+    :type commit_sha: str
+    """
+    def __init__(self, message_queue, rsa_private_key, passphrase,
+                 docker_image, build_script, build_dir, clone_url, commit_sha):
         threading.Thread.__init__(self)
-        self._docker_image = docker_image
-        self._shell_code = shell_code
-        self._build_dir = build_dir
         self._rsa_private_key = rsa_private_key
         self._passphrase = passphrase
+        self._docker_image = docker_image
+        self._build_script = build_script
+        self._build_dir = build_dir
         self._clone_url = clone_url
-        self._sha = sha
-        self._container_queue = container_queue
+        self._commit_sha = commit_sha
+        self._message_queue = message_queue
         self.return_code = None
         self.exc_info = None
 
     def run(self):
         try:
-            self._run()
+            self.return_code = self._run()
         except:
             self.exc_info = sys.exc_info()
 
@@ -190,7 +268,7 @@ class Builder(threading.Thread):
         build_starter_sh_path = build_dir_path('build-starter.sh')
         build_starter_sh_content = BUILD_STARTER_SH.format(
             clone_url=pipes.quote(self._clone_url),
-            sha=pipes.quote(self._sha))
+            commit_sha=pipes.quote(self._commit_sha))
         with open(build_starter_sh_path, 'w') as build_starter_sh:
             build_starter_sh.write(build_starter_sh_content)
 
@@ -208,8 +286,13 @@ class Builder(threading.Thread):
 
         build_script_path = build_dir_path('build-script.sh')
         with open(build_script_path, 'w') as build_script:
-            build_script.write(self._shell_code)
+            build_script.write(self._build_script)
         os.chmod(build_script_path, 0o755)
+
+        log_path = build_dir_path('build.log')
+        with open(log_path, 'w') as log:
+            log.write('')
+        os.chmod(log_path, 0o664)
 
         client = docker.Client()
 
@@ -219,28 +302,33 @@ class Builder(threading.Thread):
             command='bash /kozmic/build-starter.sh',
             volumes={'/kozmic': {}})
 
-        self._container_queue.put(container, block=True, timeout=60)
-        self._container_queue.join()
+        self._message_queue.put(container, block=True, timeout=60)
+        self._message_queue.join()
 
         client.start(container, binds={self._build_dir: '/kozmic'})
         logger.info('Docker process %s has started.', container)
 
-        self.return_code = client.wait(container)
+        return_code = client.wait(container)
         logger.info('Docker process log: %s', client.logs(container))
         client.remove_container(container)
-
         logger.info('Docker process %s has finished with return code %i.',
-                    container, self.return_code)
-
+                    container, return_code)
         logger.info('Builder has finished.')
 
+        return return_code
 
-def _do_job(task_request, hook, build, task_uuid):
+
+def _do_job(task_request, hook_call, channel):
+    """
+    :param task_request: :class:`celery.app.task.Context` of current task
+    :param hook_call: :class:`HookCall` that triggered the job
+    :param channel: Redis pub-sub channel name
+    """
     config = current_app.config
     redis_client = redis.StrictRedis(host=config['KOZMIC_REDIS_HOST'],
                                      port=config['KOZMIC_REDIS_PORT'],
                                      db=config['KOZMIC_REDIS_DATABASE'])
-
+    hook = hook_call.hook
     docker_image = hook.docker_image
 
     client = docker.Client()
@@ -257,40 +345,37 @@ def _do_job(task_request, hook, build, task_uuid):
         logger.info('%s image has been pulled.', docker_image)
 
     with create_temp_dir() as build_dir:
-        channel = task_uuid
-
+        log_path = os.path.join(build_dir, 'build.log')
         try:
-            log_path = os.path.join(build_dir, 'build.log')
-            with open(log_path, 'w') as log:
-                log.write('')
-            os.chmod(log_path, 0o664)
-
-            # Convert Windows line endings to Unix:
-            build_script = '\n'.join(hook.build_script.splitlines())
-
-            container_queue = Queue.Queue()
+            message_queue = Queue.Queue()
             builder = Builder(
                 rsa_private_key=hook.project.rsa_private_key,
-                clone_url=hook.project.gh_clone_url,
                 passphrase=hook.project.passphrase,
+                clone_url=hook.project.gh_clone_url,
+                commit_sha=hook_call.build.gh_commit_sha,
                 docker_image=docker_image,
-                shell_code=build_script,
-                sha=build.gh_commit_sha,
+                build_script=hook.build_script,
                 build_dir=build_dir,
-                container_queue=container_queue)
-            builder.start()
+                message_queue=message_queue)
 
-            container = container_queue.get(True, 60)
+            # Start Builder and wait until it will not start the container
+            builder.start()
+            container = message_queue.get(block=True, timeout=60)
+
+            # Now the container id is known and we can pass it to Tailer
             tailer = Tailer(
                 log_path=log_path,
                 redis_client=redis_client,
                 channel=channel,
                 container=container,
                 kill_timeout=config['KOZMIC_STALL_TIMEOUT'])
-            multiprocessing.util.Finalize(task_request, tailer.stop)
+            # Tailer is a daemon process. Stop it when Celery task
+            # quits by binding a finalizer on Celery task context
+            f = multiprocessing.util.Finalize(task_request, tailer.stop)
             tailer.start()
-            container_queue.task_done()
 
+            # Tell Builder to continue and wait for it to finish
+            message_queue.task_done()
             builder.join()
 
             stdout = ''
@@ -311,42 +396,49 @@ class RestartError(Exception):
 
 @celery.task
 def restart_job(id):
+    """A Celery task that restarts a job.
+
+    :param id: int, :class:`Job` identifier
+    """
     job = Job.query.get(id)
     assert 'Job#{} does not exist.'.format(id)
     if not job.is_finished():
         raise RestartError('Tried to restart %r which is not finished.', job)
 
-    build_id = job.build_id
-    hook_call_id = job.hook_call_id
     db.session.delete(job)
-    do_job.apply(args=(hook_call_id,))
+    # Run do_job task synchronously:
+    do_job.apply(args=(job.hook_call_id,))
 
 
 @celery.task
 def do_job(hook_call_id):
+    """A Celery task that does a job specified by a hook call.
+
+    Creates a :class:`Job` instance and executes a build script prescribed
+    by a triggered :class:`Hook`. Also sends job output to :attr:`Job.task_uuid`
+    Redis pub-sub channel and updates build status.
+
+    :param hook_call_id: int, :class:`HookCall` identifier
+    """
     hook_call = HookCall.query.get(hook_call_id)
     assert hook_call, 'HookCall#{} does not exist.'.format(hook_call_id)
 
-    build = hook_call.build
     job = Job(
-        build=build,
+        build=hook_call.build,
         hook_call=hook_call,
         task_uuid=do_job.request.id)
     db.session.add(job)
-
     job.started()
     db.session.commit()
 
     return_code, exc_info, stdout = _do_job(
-        do_job.request, hook_call.hook, build, job.task_uuid)
-
+        do_job.request, hook_call, job.task_uuid)
     if exc_info:
         job.finished(1)
         stdout += ('\nSorry, something went wrong. We are notified of the '
                    'issue and we will fix it soon.')
     else:
         job.finished(return_code)
-
     job.stdout = stdout
     db.session.commit()
 

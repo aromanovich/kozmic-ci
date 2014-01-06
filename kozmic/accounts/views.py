@@ -6,7 +6,7 @@ from . import bp
 from .forms import SettingsForm
 
 
-@bp.route('/settings/', methods=['GET', 'POST'])
+@bp.route('/settings/', methods=('GET', 'POST'))
 def settings():
     form = SettingsForm(request.form, obj=current_user)
     if form.validate_on_submit():

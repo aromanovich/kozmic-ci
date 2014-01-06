@@ -32,7 +32,7 @@ def get_ref_and_sha(payload):
 
 
 @csrf.exempt
-@bp.route('/_hooks/hook/<int:id>/', methods=['POST'])
+@bp.route('/_hooks/hook/<int:id>/', methods=('POST',))
 def hook(id):
     payload = json.loads(request.data)
     ref_and_sha = get_ref_and_sha(payload)

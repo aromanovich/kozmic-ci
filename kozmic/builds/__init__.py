@@ -1,3 +1,16 @@
+# coding: utf-8
+"""
+kozmic.builds
+~~~~~~~~~~~~~
+
+.. attribute:: bp
+
+    :class:`flask.Blueprint` that implements webhooks to be triggered by
+    GitHub and serves status badges.
+
+    .. note::
+        Does not require authentication.
+"""
 import ansi2html
 from flask import Blueprint
 

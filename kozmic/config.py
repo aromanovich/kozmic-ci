@@ -27,7 +27,6 @@ class DefaultConfig(object):
     CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
     CELERY_IGNORE_RESULT = True
     CELERY_DEFAULT_QUEUE = 'kozmic'
-    SERVER_NAME = None
     TAILER_URL_TEMPLATE = None
     MAIL_DEFAULT_SENDER = None  # _must_ be configured
 

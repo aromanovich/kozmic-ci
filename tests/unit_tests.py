@@ -356,7 +356,8 @@ git commit -m "Initial commit"
 class TestBuilder(TestCase):
     def _init_repo(self, repo_dir):
         subprocess.call(
-            CREATE_TEST_REPO_SH.format(repo_dir=repo_dir), shell=True)
+            CREATE_TEST_REPO_SH.format(repo_dir=repo_dir), shell=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return subprocess.check_output(
             'cd {} && git rev-parse HEAD'.format(repo_dir),
             shell=True
@@ -371,22 +372,22 @@ class TestBuilder(TestCase):
         private_key = self._generate_private_key(passphrase)
 
         with kozmic.builds.tasks.create_temp_dir() as build_dir:
-            sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
+            commit_sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
 
-            container_queue = Queue.Queue()
+            message_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
                 rsa_private_key=private_key,
                 passphrase=passphrase,
                 docker_image='aromanovich/ubuntu-kozmic',
-                shell_code='bash ./kozmic.sh',
+                build_script='#!/bin/bash\nbash ./kozmic.sh',
                 build_dir=build_dir,
                 clone_url='/kozmic/test-repo',
-                sha=sha,
-                container_queue=container_queue)
+                commit_sha=commit_sha,
+                message_queue=message_queue)
             builder.start()
-            container = container_queue.get(True, 60)
+            container = message_queue.get(True, 60)
             assert isinstance(container, dict) and 'Id' in container
-            container_queue.task_done()
+            message_queue.task_done()
             builder.join()
 
             log_path = os.path.join(build_dir, 'build.log')
@@ -402,18 +403,18 @@ class TestBuilder(TestCase):
         with a wrong passphrase.
         """
         with kozmic.builds.tasks.create_temp_dir() as build_dir:
-            sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
+            commit_sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
 
-            container_queue = Queue.Queue()
+            message_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
                 rsa_private_key=self._generate_private_key('passphrase'),
                 passphrase='wrong-passphrase',
                 docker_image='aromanovich/ubuntu-kozmic',
-                shell_code='bash ./kozmic.sh',
+                build_script='#!/bin/bash\nbash ./kozmic.sh',
                 build_dir=build_dir,
                 clone_url='/kozmic/test-repo',
-                sha=sha,
-                container_queue=mock.MagicMock())
+                commit_sha=commit_sha,
+                message_queue=mock.MagicMock())
             builder.run()
 
         assert builder.return_code == 1
@@ -423,7 +424,7 @@ class BuilderStub(kozmic.builds.tasks.Builder):
     def run(self):
         time.sleep(1)
 
-        self._container_queue.put({'Id': 'qwerty'}, block=True, timeout=60)
+        self._message_queue.put({'Id': 'qwerty'}, block=True, timeout=60)
 
         build_log_path = os.path.join(self._build_dir, 'build.log')
         with open(build_log_path, 'w') as build_log:

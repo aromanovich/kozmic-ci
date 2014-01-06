@@ -97,15 +97,3 @@ def init_celery_app(app, celery):
     if sentry_dsn:
         client = raven.Client(sentry_dsn)
         raven.contrib.celery.register_signal(client)
-
-
-def create_websockets_app(config=None):
-    app = flask.Flask(__name__)
-    config = config or os.environ.get('KOZMIC_CONFIG',
-                                      'kozmic.config.DefaultConfig')
-    app.config.from_object(config)
-    configure_extensions(app)
-    configure_blueprints(app)
-    app.jinja_env.globals['bootstrap_is_hidden_field'] = \
-        lambda field: isinstance(field, wtforms.HiddenField)
-    return app

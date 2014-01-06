@@ -1,3 +1,13 @@
+# coding: utf-8
+"""
+kozmic.projects
+~~~~~~~~~~~~~~~
+
+.. attribute:: bp
+
+    :class:`flask.Blueprint` that provides all the means for managing and
+    viewing projects.
+"""
 from flask import Blueprint
 from flask.ext.login import login_required
 

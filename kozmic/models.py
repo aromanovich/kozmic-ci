@@ -34,7 +34,7 @@ class RepositoryBase(object):
 
     @classmethod
     def from_gh_repo(cls, gh_repo):
-        """Constructs instance of `cls` from `gh_repo`.
+        """Constructs an instance of `cls` from `gh_repo`.
 
         :type gh_repo: :class:`github3.repos.repo.Repository`
         """
@@ -271,7 +271,7 @@ class Project(db.Model):
 
 
 class Hook(db.Model):
-    """Reflects GitHub hook."""
+    """Reflects a GitHub hook."""
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'),
                            nullable=False)
@@ -291,7 +291,7 @@ class Hook(db.Model):
 
 
 class Build(db.Model):
-    """Reflects a project commit that triggered a project hook."""
+    """Reflects a project commit that called a project hook."""
     __table_args__ = (
         db.UniqueConstraint('project_id', 'gh_commit_ref', 'gh_commit_sha',
                             name='unique_ref_and_sha_within_project'),
@@ -399,6 +399,8 @@ class HookCall(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    # Allow hook_id be null because we don't want to lose all the hook calls
+    # data when a manager deletes the hook
     hook_id = db.Column(db.Integer, db.ForeignKey('hook.id', ondelete='SET NULL'))
     build_id = db.Column(db.Integer, db.ForeignKey('build.id'), nullable=False)
 
@@ -414,9 +416,7 @@ class HookCall(db.Model):
 
 
 class Job(db.Model):
-    """Corresponds to a hook call and contains results of a running
-    hook build script.
-    """
+    """A job that caused by a hook call."""
     __tablename__ = 'build_step'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -425,13 +425,13 @@ class Job(db.Model):
     hook_call_id = db.Column(db.Integer, db.ForeignKey('hook_call.id'),
                              nullable=False)
 
-    #: Time job has started or None
+    #: Time the job has started or None
     started_at = db.Column(db.DateTime)
-    #: Time job has finished or None
+    #: Time the job has finished or None
     finished_at = db.Column(db.DateTime)
-    #: Build return code
+    #: Return code
     return_code = db.Column(db.Integer)
-    #: Build log
+    #: Job log
     stdout = db.deferred(db.Column(sqlalchemy.dialects.mysql.MEDIUMBLOB))
     #: uuid of a Celery task that is running a job
     task_uuid = db.Column(db.String(36))
@@ -462,7 +462,7 @@ class Job(db.Model):
         if return_code != 0:
             description = (
                 'Kozmic build #{0} has failed '
-                'because of the "{1}" hook.'.format(
+                'because of the "{1}" job.'.format(
                     self.build.number,
                     self.hook_call.hook.title))
             self.build.set_status('failure', description=description)
@@ -480,10 +480,12 @@ class Job(db.Model):
 
     @property
     def tailer_url(self):
+        """URL of a websocket to use for the showing a job log in realtime."""
         return flask.current_app.config['TAILER_URL_TEMPLATE'].format(
             task_uuid=self.task_uuid)
 
     def is_finished(self):
+        """Is the job finished?"""
         return self.status in ('success', 'failure', 'error')
 
     @property

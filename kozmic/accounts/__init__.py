@@ -1,3 +1,13 @@
+# coding: utf-8
+"""
+kozmic.accounts
+~~~~~~~~~~~~~~~
+
+.. attribute:: bp
+
+    :class:`flask.Blueprint` that gives users a means to manage their
+    account settings.
+"""
 from flask import Blueprint
 from flask.ext.login import login_required
 
