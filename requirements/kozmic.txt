@@ -1,25 +1,24 @@
 PyMySQL==0.6.1
-SQLAlchemy==0.9.0
+SQLAlchemy==0.9.1
 redis==2.8.0
-celery==3.1.4
+celery==3.1.7
 
 Flask==0.10.1
 Jinja2==2.7.1
 Werkzeug==0.9.4
 WTForms==1.0.5
 Flask-SQLAlchemy==1.0
-Flask-Script==0.6.2
-Flask-WTF==0.9.3
-Flask-Login==0.2.7
+Flask-Script==0.6.6
+Flask-WTF==0.9.4
+Flask-Login==0.2.9
 Flask-Principal==0.4.0
-Flask-Migrate==0.1.4
+Flask-Migrate==1.1.1
 Flask-OAuth==0.12
 Flask-Assets==0.8
 Flask-Mail==0.9.0
 
 alembic==0.6.2
 ansi2html==1.0.5
-pytailf==1.1
 pycrypto==2.6.1
 furl==0.3.5
 # Replace with github3.py==0.8.0 as it gets released:
@@ -28,4 +27,4 @@ certifi==0.0.8
 ipython==1.1.0  # to have nice ./manage.py shell
 docker-py==0.2.2
 requests==1.2.0  # due to https://github.com/dotcloud/docker-py/issues/47
-raven==3.5.2
+raven==4.0.2
