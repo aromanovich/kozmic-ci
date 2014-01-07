@@ -1,8 +1,13 @@
 # coding: utf-8
+"""
+kozmic
+~~~~~~
+
+.. autofunction:: create_app
+"""
 import os
 
 import flask
-import wtforms
 import raven.contrib
 from celery import Celery, Task
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -24,6 +29,15 @@ mail = Mail()
 
 
 def create_app(config=None):
+    """Returns a fully configured :class:`Flask` application.
+
+    :param config: a config object or it's name. Will be passed directly
+                   to :meth:`flask.config.Config.from_object`.
+                   If not specified, the value of ``KOZMIC_CONFIG``
+                   environment variable will be used.
+                   If ``KOZMIC_CONFIG`` is not specified,
+                   ``'kozmic.config.DefaultConfig'`` will be used. 
+    """
     app = flask.Flask(__name__)
     config = config or os.environ.get('KOZMIC_CONFIG',
                                       'kozmic.config.DefaultConfig')
@@ -71,6 +85,7 @@ def configure_blueprints(app):
 
 
 def register_jinja2_globals_and_filters(app):
+    import wtforms
     from kozmic.builds import get_ansi_to_html_converter
     app.jinja_env.globals['bootstrap_is_hidden_field'] = \
         lambda field: isinstance(field, wtforms.HiddenField)

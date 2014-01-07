@@ -19,8 +19,10 @@ Core
 .. automodule:: tailer
    :members:
 
-Packages
---------
+Packages overview
+-----------------
+
+.. automodule:: kozmic.__init__
 
 .. automodule:: kozmic.accounts
 

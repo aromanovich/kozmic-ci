@@ -16,7 +16,8 @@ from flask.ext.mail import Message
 from werkzeug.utils import cached_property
 from sqlalchemy.ext.declarative import declared_attr
 
-from kozmic import db, mail, perms
+from . import db, mail, perms
+from .utils import JSONEncodedDict
 
 
 class RepositoryBase(object):
@@ -407,8 +408,8 @@ class HookCall(db.Model):
     #: Created at
     created_at = db.Column(db.DateTime, nullable=False,
                            default=datetime.datetime.utcnow)
-    #: Pickled JSON payload from a GitHub request
-    gh_payload = db.deferred(db.Column(db.PickleType, nullable=False))
+    #: JSON payload from a GitHub webhook request
+    gh_payload = db.deferred(db.Column(JSONEncodedDict, nullable=False))
     #: Hook
     hook = db.relationship(Hook, backref=db.backref('calls', lazy='dynamic'))
     #: Build

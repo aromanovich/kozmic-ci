@@ -43,16 +43,17 @@ def create_temp_dir():
 
 
 class Tailer(threading.Thread):
-    """A daemon thread that watches for additional lines to be appended to a
+    """A daemon thread that waits for additional lines to be appended to a
     specified log file.
-    Once there is a new line, it translates ANSI sequences to HTML tags and:
+    Once there is a new line, it does the following:
 
-    1. Sends the line to a Redis pub/sub channel;
-    2. Pushes it to Redis list of the same name.
+    1. Translates ANSI sequences to HTML tags;
+    2. Sends the line to a Redis pub/sub channel;
+    3. Pushes it to Redis list of the same name.
 
-    If the log does not change for ``kill_timeout`` seconds, specified Docker
-    container will be killed and corresponding message will be published
-    to the log.
+    If the log file does not change for ``kill_timeout`` seconds,
+    specified Docker container will be killed and corresponding message
+    will be appended to the log file.
 
     :param log_path: path to the log file to watch
     :type log_path: str
