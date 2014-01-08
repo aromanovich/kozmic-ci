@@ -112,8 +112,12 @@ class User(HasRepositories, db.Model, UserMixin):
     def get_identity(self):
         """Returns user's :class:`flask.ext.principal.Identity`."""
         identity = Identity(self.id)
-        for project in self.projects:
-            identity.provides.add(perms.project_manager(project.id))
+        for membership in self.memberships:
+            if membership.allows_management:
+                need = perms.project_manager(membership.project_id)
+            else:
+                need = perms.project_member(membership.project_id)
+            identity.provides.add(need)
         for project in self.owned_projects:
             identity.provides.add(perms.project_owner(project.id))
         return identity
@@ -203,12 +207,19 @@ class Organization(HasRepositories, db.Model):
         'User', backref=db.backref('organizations', lazy='dynamic'))
 
 
-project_members = db.Table(
-    'project_members', db.Model.metadata,
-    db.Column('project_id', db.Integer, db.ForeignKey('project.id')),
-    db.Column('user_id', db.Integer, db.ForeignKey('user.id')),
-    db.Column('created_at', db.DateTime, nullable=False,
-              default=datetime.datetime.utcnow))
+class Membership(db.Model):
+    __tablename__ = 'project_members'
+
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True)
+
+    created_at = db.Column(db.DateTime, nullable=False,
+                           default=datetime.datetime.utcnow)
+    allows_management = db.Column(db.Boolean, nullable=False, default=False)
+    user = db.relationship(
+        'User', backref=db.backref('memberships', lazy='dynamic'))
+    project = db.relationship(
+        'Project', backref=db.backref('memberships', lazy='dynamic'))
 
 
 class Project(db.Model):
@@ -238,8 +249,8 @@ class Project(db.Model):
 
     #: Project members
     members = db.relationship(
-        'User', secondary=project_members, lazy='dynamic',
-        backref=db.backref('projects', lazy='dynamic'))
+        'User', secondary='project_members', lazy='dynamic', viewonly=True,
+        backref=db.backref('projects', lazy='dynamic', viewonly=True))
     #: Project owner
     owner = db.relationship(
         'User', backref=db.backref('owned_projects', lazy='dynamic'))

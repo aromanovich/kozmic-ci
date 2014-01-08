@@ -8,7 +8,7 @@ from flask.ext.login import current_user
 from . import bp
 from .forms import HookForm, MemberForm
 from kozmic import db, perms
-from kozmic.models import Project, Hook, Build, Job, User
+from kozmic.models import Project, User, Membership, Hook, Build, Job
 
 
 logger = logging.getLogger(__name__)
@@ -29,9 +29,20 @@ def show(id):
     return redirect(url_for('.build', project_id=id, id='latest'))
 
 
+def get_project(id, for_management=True):
+    project = Project.query.get_or_404(id)
+    if for_management:
+        permission_to_test = perms.manage_project(id)
+    else:
+        permission_to_test = perms.view_project(id)
+    permission_to_test.test(http_exception=403)
+    return project
+
+
 @bp.route('/<int:id>/history/')
 def history(id):
-    project = Project.query.get_or_404(id)
+    project = get_project(id, for_management=False)
+
     builds = project.builds.order_by(Build.id.desc())
     if not builds.first():
         return redirect(url_for('.settings', id=id))
@@ -48,7 +59,7 @@ def history(id):
 
 @bp.route('/<int:project_id>/builds/<id>/')
 def build(project_id, id):
-    project = Project.query.get_or_404(project_id)
+    project = get_project(project_id, for_management=False)
 
     if id == 'latest':
         build = project.get_latest_build(ref=request.args.get('ref'))
@@ -75,7 +86,7 @@ def build(project_id, id):
 
 @bp.route('/<int:project_id>/builds/<int:build_id>/jobs/<int:id>/')
 def job(project_id, build_id, id):
-    project = Project.query.get_or_404(project_id)
+    project = get_project(project_id, for_management=False)
     build = project.builds.filter_by(id=build_id).first_or_404()
     job = build.jobs.filter_by(id=id).first_or_404()
 
@@ -89,7 +100,7 @@ def job(project_id, build_id, id):
 
 @bp.route('/<int:project_id>/jobs/<int:id>/log/')
 def job_log(project_id, id):
-    project = Project.query.get_or_404(project_id)
+    project = get_project(project_id, for_management=False)
     job = project.builds.join(Job).filter(
         Job.id == id).with_entities(Job).first_or_404()
     return Response(job.stdout, mimetype='text/plain')
@@ -100,7 +111,7 @@ def job_restart(project_id, id):
     # Import at runtime for easier mocking:
     from kozmic.builds.tasks import restart_job
 
-    project = Project.query.get_or_404(project_id)
+    project = get_project(project_id, for_management=True)
     job = project.builds.join(Job).filter(
         Job.id == id).with_entities(Job).first_or_404()
     restart_job.delay(job.id)
@@ -111,15 +122,20 @@ def job_restart(project_id, id):
 
 @bp.route('/<int:id>/settings/')
 def settings(id):
-    project = Project.query.get_or_404(id)
+    project = get_project(id, for_management=False)
+    members = project.members.join(Membership).with_entities(
+        User, Membership.allows_management).all()
     return render_template(
-        'projects/settings.html', project=project,
+        'projects/settings.html',
+        project=project,
+        members=members,
+        is_current_user_a_manager=perms.manage_project(id).can(),
         fqdn=current_app.config['SERVER_NAME'])
 
 
 @bp.route('/<int:project_id>/hooks/add/', methods=('GET', 'POST'))
 def add_hook(project_id):
-    project = Project.query.get_or_404(project_id)
+    project = get_project(project_id, for_management=True)
 
     form = HookForm(request.form)
     if form.validate_on_submit():
@@ -162,7 +178,7 @@ def add_hook(project_id):
 
 @bp.route('/<int:project_id>/hooks/<int:hook_id>/edit/', methods=('GET', 'POST'))
 def edit_hook(project_id, hook_id):
-    project = Project.query.get_or_404(project_id)
+    project = get_project(project_id, for_management=True)
     hook = project.hooks.filter_by(id=hook_id).first_or_404()
 
     form_kwargs = {}
@@ -184,7 +200,7 @@ def edit_hook(project_id, hook_id):
 
 @bp.route('/<int:project_id>/hooks/<int:hook_id>/delete/', methods=('POST',))
 def delete_hook(project_id, hook_id):
-    project = Project.query.get_or_404(project_id)
+    project = get_project(project_id, for_management=True)
     hook = project.hooks.filter_by(id=hook_id).first_or_404()
 
     db.session.delete(hook)
@@ -210,17 +226,22 @@ def delete_hook(project_id, hook_id):
     return redirect(url_for('.settings', id=project_id))
 
 
-@bp.route('/<int:project_id>/members/add/', methods=['GET', 'POST'])
-def add_member(project_id):
-    project = Project.query.get_or_404(project_id)
+@bp.route('/<int:project_id>/members/add/', methods=('GET', 'POST'))
+def add_membership(project_id):
+    project = get_project(project_id, for_management=True)
 
     form = MemberForm(request.form)
     if form.validate_on_submit():
         gh_login = form.gh_login.data
         user = User.query.filter_by(gh_login=gh_login).first()
         if user:
-            if user not in project.members and user != project.owner:
-                project.members.append(user)
+            membership = project.memberships.filter_by(user=user).first()
+            if not membership and user != project.owner:
+                membership = Membership(
+                    user=user,
+                    project=project,
+                    allows_management=form.is_manager.data)
+                db.session.add(membership)
                 db.session.commit()
             return redirect(url_for('.settings', id=project_id))
         else:
@@ -230,10 +251,27 @@ def add_member(project_id):
         'projects/add-member.html', project=project, form=form)
 
 
+@bp.route('/<int:project_id>/members/<int:user_id>/edit/', methods=('GET', 'POST'))
+def edit_membership(project_id, user_id):
+    project = get_project(project_id, for_management=True)
+    membership = project.memberships.filter_by(user_id=user_id).first_or_404()
+
+    form = MemberForm(request.form, is_manager=membership.allows_management)
+    del form.gh_login
+    if form.validate_on_submit():
+        membership.allows_management = form.is_manager.data
+        db.session.add(membership)
+        db.session.commit()
+        return redirect(url_for('.settings', id=project_id))
+    return render_template(
+        'projects/edit-member.html', project=project,
+        member=membership.user, form=form)
+
+
 @bp.route('/<int:project_id>/members/<int:user_id>/delete/', methods=('GET', 'POST'))
-def delete_member(project_id, user_id):
-    project = Project.query.get_or_404(project_id)
-    user = project.members.filter_by(id=user_id).first_or_404()
-    project.members.remove(user)
+def delete_membership(project_id, user_id):
+    project = get_project(project_id, for_management=True)
+    membership = project.memberships.filter_by(user_id=user_id).first_or_404()
+    db.session.delete(membership)
     db.session.commit()
     return redirect(url_for('.settings', id=project_id))

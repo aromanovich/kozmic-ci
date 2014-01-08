@@ -22,4 +22,6 @@ class HookForm(wtf.Form):
 class MemberForm(wtf.Form):
     gh_login = wtforms.TextField(
         'User\'s GitHub login', [wtforms.validators.Required()])
+    is_manager = wtforms.BooleanField(
+        'Is manager?', [wtforms.validators.NumberRange(0, 1)])
     submit = wtforms.SubmitField('Save')

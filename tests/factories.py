@@ -3,7 +3,7 @@ import datetime
 
 import factory.alchemy
 
-from kozmic.models import (db, User, Project, Hook, HookCall,
+from kozmic.models import (db, User, Project, Membership, Hook, HookCall,
                            Build, Job, Organization)
 
 
@@ -27,6 +27,7 @@ def reset():
         BuildFactory,
         ProjectFactory,
         UserFactory,
+        MembershipFactory,
         UserRepositoryFactory,
         OrganizationFactory,
         OrganizationRepositoryFactory,
@@ -85,6 +86,10 @@ class OrganizationRepositoryFactory(Factory):
     @factory.lazy_attribute
     def gh_clone_url(self):
         return 'git://github.com/{}.git'.format(self.gh_full_name)
+
+
+class MembershipFactory(Factory):
+    FACTORY_FOR = Membership
 
 
 class ProjectFactory(Factory):

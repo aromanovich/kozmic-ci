@@ -19,7 +19,7 @@ from flask.ext.webtest import SessionScope
 import kozmic.builds.tasks
 import kozmic.builds.views
 from kozmic import mail
-from kozmic.models import db, User, Project, Build
+from kozmic.models import db, Membership, User, Project, Build
 from . import TestCase, factories, unit_fixtures as fixtures, func_fixtures
 
 
@@ -88,10 +88,12 @@ class TestUserDB(TestCase):
         self.projects = {self.project_1, self.project_2, self.project_3,
                          self.project_4, self.project_5}
 
-        self.user_1.projects.extend([self.project_4, self.project_5])
-        db.session.commit()
-
     def test_get_available_projects(self):
+        for project in [self.project_4, self.project_5]:
+            factories.MembershipFactory.create(
+                user=self.user_1,
+                project=project)
+
         factories.BuildFactory.create_batch(5, project=self.project_1)
         factories.BuildFactory.create_batch(5, project=self.project_2)
         factories.BuildFactory.create_batch(3, project=self.project_4)
@@ -111,8 +113,13 @@ class TestUserDB(TestCase):
         assert not self.user_4.get_available_projects()
 
     def test_get_identity(self):
-        self.user_1.projects.extend([self.project_4, self.project_5])
-        db.session.commit()
+        factories.MembershipFactory.create(
+            user=self.user_1,
+            project=self.project_4,
+            allows_management=True)
+        factories.MembershipFactory.create(
+            user=self.user_1,
+            project=self.project_5)
 
         identity = self.user_1.get_identity()
         assert identity.provides == {
@@ -120,7 +127,7 @@ class TestUserDB(TestCase):
             Need(method='project_owner', value=self.project_2.id),
             Need(method='project_owner', value=self.project_3.id),
             Need(method='project_manager', value=self.project_4.id),
-            Need(method='project_manager', value=self.project_5.id),
+            Need(method='project_member', value=self.project_5.id),
         }
 
         identity = self.user_2.get_identity()
@@ -167,8 +174,8 @@ class TestBuildDB(TestCase):
         # 2. There are members with email addresses
         member_1 = factories.UserFactory.create(email='john@doe.com')
         member_2 = factories.UserFactory.create(email='jane@doe.com')
-        self.project.members.extend([member_1, member_2])
-        db.session.commit()
+        for member in [member_1, member_2]:
+            factories.MembershipFactory.create(user=member, project=self.project)
 
         build_2 = factories.BuildFactory.create(project=self.project)
 

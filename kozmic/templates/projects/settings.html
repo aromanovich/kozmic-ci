@@ -10,22 +10,29 @@
       {% for hook in project.hooks %}
         <div class="list-group-item">
           <h4>{{ hook.title }}</h4>
-          <pre>{{ hook.build_script }}</pre>
-          
-          <a class="btn btn-default" id="edit-hook-{{ hook.id }}"
-             href="{{ url_for('.edit_hook', project_id=project.id,
-                              hook_id=hook.id) }}">
-            <span class="glyphicon glyphicon-edit"></span> Edit
-          </a>
-          
-          <form method="POST" style="display: inline;"
-                action="{{ url_for('.delete_hook', project_id=project.id, hook_id=hook.id) }}"
-                id="delete-hook-{{ hook.id }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-default">
-              <span class="glyphicon glyphicon-remove-sign"></span> Delete
-            </button>
-          </form>
+          <dl>
+            <dt>Docker image</dt>
+            <dd>{{ hook.docker_image }}</dd>
+            <dt>Build script</dt>
+            <dd><pre>{{ hook.build_script }}</pre></dd>
+          </dl>
+
+          {% if is_current_user_a_manager %}
+            <a class="btn btn-default" id="edit-hook-{{ hook.id }}"
+               href="{{ url_for('.edit_hook', project_id=project.id,
+                                hook_id=hook.id) }}">
+              <span class="glyphicon glyphicon-edit"></span> Edit
+            </a>
+
+            <form method="POST" style="display: inline;"
+                  action="{{ url_for('.delete_hook', project_id=project.id, hook_id=hook.id) }}"
+                  id="delete-hook-{{ hook.id }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-default">
+                <span class="glyphicon glyphicon-remove-sign"></span> Delete
+              </button>
+            </form>
+          {% endif %}
         </div>
       {% endfor %}
     </div> 
@@ -33,10 +40,12 @@
     <p>Hooks haven't been configured yet.</p>
   {% endif %}
 
-  <a href="{{ url_for('.add_hook', project_id=project.id) }}" class="btn btn-default">
-    <span class="glyphicon glyphicon-plus-sign"></span>
-    Add a new hook
-  </a>
+  {% if is_current_user_a_manager %}
+    <a href="{{ url_for('.add_hook', project_id=project.id) }}" class="btn btn-default">
+      <span class="glyphicon glyphicon-plus-sign"></span>
+      Add a new hook
+    </a>
+  {% endif %}
   
   <hr>
 
@@ -53,27 +62,41 @@
   <h3>Members</h3>
 
   <div class="list-group  members">
-    {% for member in [project.owner] + project.members.all() %}
+    {% for member, is_manager in [(project.owner, True)] + members %}
     <div class="list-group-item  member {% if member == project.owner %}owner{% endif %}">
         <img src="{{ member.gh_avatar_url }}" height="38" class="img-circle">
-        {{ member.gh_login }} {% if member == project.owner %}(owner){% endif %}
+        {{ member.gh_login }}
+        {% if member == project.owner %}
+          (owner)
+        {% elif is_manager %}
+          (manager)
+        {% endif %}
+        {% if is_current_user_a_manager -%}
+          {% if member != project.owner %}
+            <form id="delete-member-{{ member.id }}" method="POST" class="pull-right"
+                  action="{{ url_for('.delete_membership', project_id=project.id,
+                                     user_id=member.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-default">
+                <span class="glyphicon glyphicon-remove-sign"></span> Delete
+              </button>
+            </form>
 
-        {% if member != project.owner %} 
-          <form id="delete-member-{{ member.id }}" method="POST" class="pull-right"
-                action="{{ url_for('.delete_member', project_id=project.id,
-                                   user_id=member.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-default">
-              <span class="glyphicon glyphicon-remove-sign"></span> Delete
-            </button>
-          </form>
+            <a class="btn btn-default pull-right  edit" id="edit-member-{{ member.id }}"
+               href="{{ url_for('.edit_membership', project_id=project.id,
+                                user_id=member.id) }}">
+              <span class="glyphicon glyphicon-edit"></span> Edit
+            </a>
+          {% endif %}
         {% endif %}
       </div>
     {% endfor %}
   </div> 
 
-  <a href="{{ url_for('.add_member', project_id=project.id) }}" class="btn btn-default">
-    <span class="glyphicon glyphicon-plus-sign"></span>
-    Add a new member
-  </a>
+  {% if is_current_user_a_manager -%}
+    <a href="{{ url_for('.add_membership', project_id=project.id) }}" class="btn btn-default">
+      <span class="glyphicon glyphicon-plus-sign"></span>
+      Add a new member
+    </a>
+  {% endif %}
 {% endblock %}

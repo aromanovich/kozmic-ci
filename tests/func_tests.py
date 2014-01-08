@@ -10,7 +10,7 @@ import github3.git
 from flask import url_for
 
 import kozmic.builds.tasks
-from kozmic.models import User, Project, Hook, HookCall, Build, Job
+from kozmic.models import User, Project, Membership, Hook, HookCall, Build, Job
 from . import TestCase, func_fixtures as fixtures
 from . import factories, unit_tests
 
@@ -331,8 +331,8 @@ class TestMembersManagement(TestCase):
         assert len(member_divs) == 1
         assert 'aromanovich' in member_divs[0].text_content()
 
-        self.project.members.extend([self.ramm, self.vsokolov])
-        self.db.session.commit()
+        for user in [self.ramm, self.vsokolov]:
+            factories.MembershipFactory.create(user=user, project=self.project)
 
         settings_page = self.get_project_settings_page(self.project)
         member_divs = settings_page.lxml.cssselect('.members .member')
@@ -341,7 +341,7 @@ class TestMembersManagement(TestCase):
         assert 'ramm' in member_divs[1].text_content()
         assert 'vsokolov' in member_divs[2].text_content()
 
-    def test_manager_can_add_member(self):
+    def test_manager_can_add_membership(self):
         """Manager can add a member to a project."""
         self.login(user_id=self.aromanovich.id)
 
@@ -358,16 +358,41 @@ class TestMembersManagement(TestCase):
         member_form['gh_login'] = 'ramm'
         member_form.submit().follow()
         member_form['gh_login'] = 'vsokolov'
+        member_form['is_manager'] = True
         member_form.submit().follow()
 
         assert self.project.members.count() == 2
 
-    def test_manager_can_delete_member(self):
+        ramm_membership = self.project.memberships.filter_by(
+            user=self.ramm).first()
+        assert not ramm_membership.allows_management
+        vsokolov_membership = self.project.memberships.filter_by(
+            user=self.vsokolov).first()
+        assert vsokolov_membership.allows_management
+
+    def test_manager_can_edit_membership(self):
+        """Manager can edit a membership."""
+        self.login(user_id=self.aromanovich.id)
+
+        for user in [self.ramm, self.vsokolov]:
+            factories.MembershipFactory.create(user=user, project=self.project)
+
+        settings_page = self.get_project_settings_page(self.project)
+        form = settings_page.click(
+            linkid='edit-member-{}'.format(self.ramm.id)).form
+        form['is_manager'] = True
+        form.submit()
+
+        ramm_membership = self.project.memberships.filter_by(
+            user=self.ramm).first()
+        assert ramm_membership.allows_management
+
+    def test_manager_can_delete_membership(self):
         """Manager can delete a project member."""
         self.login(user_id=self.aromanovich.id)
 
-        self.project.members.extend([self.ramm, self.vsokolov])
-        self.db.session.commit()
+        for user in [self.ramm, self.vsokolov]:
+            factories.MembershipFactory.create(user=user, project=self.project)
 
         settings_page = self.get_project_settings_page(self.project)
 
