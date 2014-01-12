@@ -1,14 +1,11 @@
-Welcome to kozmic's documentation!
-==================================
+Kozmic CI
+=========
+
+Kozmic CI is a self-hosted continuous integration service. It is written in Python,
+integrated with GitHub and powered by Docker.
 
 .. toctree::
    :maxdepth: 2
 
+   setup
    internals
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
