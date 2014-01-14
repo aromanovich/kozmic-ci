@@ -133,9 +133,19 @@ def settings(id):
         fqdn=current_app.config['SERVER_NAME'])
 
 
+def convert_crlf_to_lf(s):
+    """Converts Windows line endings to Unix."""
+    return '\n'.join(s.splitlines())
+
+
 @bp.route('/<int:project_id>/hooks/add/', methods=('GET', 'POST'))
 def add_hook(project_id):
     project = get_project(project_id, for_management=True)
+
+    if 'build_script' in request.form:
+        request.form = request.form.copy()
+        request.form['build_script'] = convert_crlf_to_lf(
+            request.form['build_script'])
 
     form = HookForm(request.form)
     if form.validate_on_submit():
@@ -181,13 +191,12 @@ def edit_hook(project_id, hook_id):
     project = get_project(project_id, for_management=True)
     hook = project.hooks.filter_by(id=hook_id).first_or_404()
 
-    form_kwargs = {}
     if 'build_script' in request.form:
-        # Convert Windows line endings to Unix:
-        form_kwargs['build_script'] = '\n'.join(
-            request.form['build_script'].splitlines())
+        request.form = request.form.copy()
+        request.form['build_script'] = convert_crlf_to_lf(
+            request.form['build_script'])
 
-    form = HookForm(request.form, obj=hook, **form_kwargs)
+    form = HookForm(request.form, obj=hook)
     if form.validate_on_submit():
         form.populate_obj(hook)
         db.session.add(hook)

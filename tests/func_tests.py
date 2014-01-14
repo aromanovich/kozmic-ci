@@ -187,7 +187,7 @@ class TestHooksManagement(TestCase):
         # Fill the hook creation form
         hook_data = {
             'title': 'Tests on debian-7',
-            'build_script': './kozmic.sh',
+            'build_script': '#!/bin/bash\r\n./kozmic.sh',
             'docker_image': 'debian-7',
         }
         for field, value in hook_data.items():
@@ -199,13 +199,13 @@ class TestHooksManagement(TestCase):
             return_value=github3.repos.hook.Hook(fixtures.HOOK_DATA))
 
         with mock.patch.object(Project, 'gh', gh_repo_mock):
-            hook_form.submit()
+            r = hook_form.submit()
 
         # Ensure that hook has been created with the right data
         assert self.project.hooks.count() == 1
         hook = self.project.hooks.first()
         assert hook.title == hook_data['title']
-        assert hook.build_script == hook_data['build_script']
+        assert hook.build_script == '#!/bin/bash\n./kozmic.sh'
         assert hook.docker_image == hook_data['docker_image']
 
         # And GitHub API has been called with the right arguments
@@ -245,12 +245,12 @@ class TestHooksManagement(TestCase):
         hook_form = settings_page.click(linkid=link_id).form
         hook_form['title'] == hook_1.title
         hook_form['title'] = 'PEP 8 check'
-        hook_form['build_script'] = 'pep8 app.py'
+        hook_form['build_script'] = '#!/bin/sh\r\npep8 app.py'
         hook_form.submit()
 
         # Ensure the changes are saved
         assert hook_1.title == 'PEP 8 check'
-        assert hook_1.build_script == 'pep8 app.py'
+        assert hook_1.build_script == '#!/bin/sh\npep8 app.py'
 
         # Trying to submit form without required field
         hook_form['title'] = ''
