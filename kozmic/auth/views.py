@@ -18,8 +18,8 @@ def auth_callback(response):
                  gh_name=gh_user.name,
                  gh_login=gh_user.login,
                  gh_avatar_url=gh_user.avatar_url,
-                 gh_access_token=access_token,
                  email=gh_user.email))
+    user.gh_access_token = access_token
     db.session.add(user)
     db.session.commit()
     login_user(user, remember=True)
