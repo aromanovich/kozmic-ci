@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 import github3
 from Crypto.PublicKey import RSA
@@ -8,6 +9,9 @@ from flask.ext.login import current_user
 from kozmic import db
 from kozmic.models import User, Organization, Project
 from . import bp
+
+
+logger = logging.getLogger(__name__)
 
 
 @bp.route('/')
