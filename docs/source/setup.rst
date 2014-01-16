@@ -1,4 +1,4 @@
-Installation and set up
+Installation and Set Up
 =======================
 
 Basic prerequisites you’ll need in order to run Kozmic CI:

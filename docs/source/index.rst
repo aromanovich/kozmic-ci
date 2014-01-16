@@ -8,4 +8,5 @@ integrated with GitHub and powered by Docker.
    :maxdepth: 2
 
    setup
+   images
    internals
