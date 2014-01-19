@@ -20,6 +20,7 @@ import subprocess
 import fcntl
 import select
 import Queue
+from contextlib import contextmanager
 
 import tailf
 import docker
@@ -122,7 +123,7 @@ class Tailer(threading.Thread):
                     iterations_without_read += 1
                     if iterations_without_read * self._read_timeout < self._kill_timeout:
                         continue
-                    message = 'Sorry, your build has stalled and been killed.\n'
+                    message = 'Sorry, your script has stalled and been killed.\n'
                     with open(self._log_path, 'a') as log:
                         log.write(message)
                     self._publish([message])
@@ -146,7 +147,7 @@ class Tailer(threading.Thread):
             tailf.wait()
 
 
-BUILD_STARTER_SH = '''
+SCRIPT_STARTER_SH = '''
 set -x
 set -e
 function cleanup {{  # escape
@@ -159,7 +160,7 @@ function cleanup {{  # escape
   # all /kozmic subfolders.
 
   # Note: `|| true` to be sure that we will not change
-  # ./build-script return code by running `chmod`
+  # ./script.sh return code by running `chmod`
 
   chmod -Rf a+w $(find /kozmic -type d) || true
 }}  # escape
@@ -170,7 +171,7 @@ ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 # Start ssh-agent service...
 eval `ssh-agent -s`
 # ...and add private key to the agent, so we won't be asked
-# for passphrase on git clone. Let ssh-add read passphrase
+# for passphrase during git clone. Let ssh-add read passphrase
 # by running askpass.sh for the security's sake.
 SSH_ASKPASS=/kozmic/askpass.sh DISPLAY=:0.0 nohup ssh-add /kozmic/id_rsa
 rm /kozmic/askpass.sh /kozmic/id_rsa
@@ -182,7 +183,7 @@ groupadd -f admin
 useradd -m -d /home/kozmic -G admin -s /bin/bash kozmic
 chown -R kozmic /kozmic
 # Redirect stdout to the file being translated to the redis pubsub channel
-TERM=xterm su kozmic -c "/kozmic/build-script.sh" &> /kozmic/build.log
+TERM=xterm su kozmic -c "/kozmic/script.sh" &> /kozmic/script.log
 '''.strip()
 
 ASKPASS_SH = '''
@@ -231,9 +232,9 @@ class Builder(threading.Thread):
                          has to be already pulled from the registry.
     :type docker_image: str
 
-    :param build_dir: path of the directory to be mounted in container's
-                      `/kozmic` path
-    :type build_dir: str
+    :param working_dir: path of the directory to be mounted in container's
+                        `/kozmic` path
+    :type working_dir: str
 
     :param clone_url: SSH clone URL
     :type clone_url: str
@@ -242,18 +243,21 @@ class Builder(threading.Thread):
     :type commit_sha: str
     """
     def __init__(self, message_queue, rsa_private_key, passphrase,
-                 docker_image, build_script, build_dir, clone_url, commit_sha):
+                 docker_image, script, working_dir, clone_url, commit_sha,
+                 remove_container=True):
         threading.Thread.__init__(self)
         self._rsa_private_key = rsa_private_key
         self._passphrase = passphrase
         self._docker_image = docker_image
-        self._build_script = build_script
-        self._build_dir = build_dir
+        self._build_script = script
+        self._working_dir = working_dir
         self._clone_url = clone_url
         self._commit_sha = commit_sha
         self._message_queue = message_queue
+        self._remove_container = remove_container
         self.return_code = None
         self.exc_info = None
+        self.container = None
 
     def run(self):
         try:
@@ -264,33 +268,33 @@ class Builder(threading.Thread):
     def _run(self):
         logger.info('Builder has started.')
 
-        build_dir_path = lambda f: os.path.join(self._build_dir, f)
+        working_dir_path = lambda f: os.path.join(self._working_dir, f)
 
-        build_starter_sh_path = build_dir_path('build-starter.sh')
-        build_starter_sh_content = BUILD_STARTER_SH.format(
+        script_starter_sh_path = working_dir_path('script-starter.sh')
+        script_starter_sh_content = SCRIPT_STARTER_SH.format(
             clone_url=pipes.quote(self._clone_url),
             commit_sha=pipes.quote(self._commit_sha))
-        with open(build_starter_sh_path, 'w') as build_starter_sh:
-            build_starter_sh.write(build_starter_sh_content)
+        with open(script_starter_sh_path, 'w') as script_starter_sh:
+            script_starter_sh.write(script_starter_sh_content)
 
-        askpass_sh_path = build_dir_path('askpass.sh')
+        askpass_sh_path = working_dir_path('askpass.sh')
         askpass_sh_content = ASKPASS_SH.format(
             passphrase=pipes.quote(self._passphrase))
         with open(askpass_sh_path, 'w') as askpass_sh:
             askpass_sh.write(askpass_sh_content)
         os.chmod(askpass_sh_path, 0o100)
 
-        id_rsa_path = build_dir_path('id_rsa')
+        id_rsa_path = working_dir_path('id_rsa')
         with open(id_rsa_path, 'w') as id_rsa:
             id_rsa.write(self._rsa_private_key)
         os.chmod(id_rsa_path, 0o400)
 
-        build_script_path = build_dir_path('build-script.sh')
-        with open(build_script_path, 'w') as build_script:
-            build_script.write(self._build_script)
-        os.chmod(build_script_path, 0o755)
+        script_path = working_dir_path('script.sh')
+        with open(script_path, 'w') as script:
+            script.write(self._build_script)
+        os.chmod(script_path, 0o755)
 
-        log_path = build_dir_path('build.log')
+        log_path = working_dir_path('script.log')
         with open(log_path, 'w') as log:
             log.write('')
         os.chmod(log_path, 0o664)
@@ -298,67 +302,48 @@ class Builder(threading.Thread):
         client = docker.Client()
 
         logger.info('Starting Docker process...')
-        container = client.create_container(
+        self.container = client.create_container(
             self._docker_image,
-            command='bash /kozmic/build-starter.sh',
+            command='bash /kozmic/script-starter.sh',
             volumes={'/kozmic': {}})
 
-        self._message_queue.put(container, block=True, timeout=60)
+        self._message_queue.put(self.container, block=True, timeout=60)
         self._message_queue.join()
 
-        client.start(container, binds={self._build_dir: '/kozmic'})
-        logger.info('Docker process %s has started.', container)
+        client.start(self.container, binds={self._working_dir: '/kozmic'})
+        logger.info('Docker process %s has started.', self.container)
 
-        return_code = client.wait(container)
-        logger.info('Docker process log: %s', client.logs(container))
-        client.remove_container(container)
+        return_code = client.wait(self.container)
+        logger.info('Docker process log: %s', client.logs(self.container))
+        if self._remove_container:
+            client.remove_container(self.container)
         logger.info('Docker process %s has finished with return code %i.',
-                    container, return_code)
+                    self.container, return_code)
         logger.info('Builder has finished.')
 
         return return_code
 
 
-def _do_job(task_request, hook_call, channel):
-    """
-    :param task_request: :class:`celery.app.task.Context` of current task
-    :param hook_call: :class:`HookCall` that triggered the job
-    :param channel: Redis pub-sub channel name
-    """
-    config = current_app.config
-    redis_client = redis.StrictRedis(host=config['KOZMIC_REDIS_HOST'],
-                                     port=config['KOZMIC_REDIS_PORT'],
-                                     db=config['KOZMIC_REDIS_DATABASE'])
-    hook = hook_call.hook
-    docker_image = hook.docker_image
+@contextmanager
+def _run(redis_client, channel, stall_timeout,
+         rsa_private_key, passphrase, clone_url, commit_sha,
+         docker_image, script,
+         remove_container=True):
 
-    client = docker.Client()
-    logger.info('Pulling %s image...', docker_image)
-    try:
-        client.pull(docker_image)
-        # Make sure that image has been successfully pulled by calling
-        # `inspect_image` on it:
-        client.inspect_image(docker_image)
-    except docker.APIError as e:
-        logger.info('Failed to pull %s: %s.', docker_image, e)
-        return 1, None, str(e)
-    else:
-        logger.info('%s image has been pulled.', docker_image)
-
-    with create_temp_dir() as build_dir:
-        log_path = os.path.join(build_dir, 'build.log')
+    with create_temp_dir() as working_dir:
+        message_queue = Queue.Queue()
+        builder = Builder(
+            rsa_private_key=rsa_private_key,
+            passphrase=passphrase,
+            clone_url=clone_url,
+            commit_sha=commit_sha,
+            docker_image=docker_image,
+            script=script,
+            working_dir=working_dir,
+            message_queue=message_queue,
+            remove_container=remove_container)
+        log_path = os.path.join(working_dir, 'script.log')
         try:
-            message_queue = Queue.Queue()
-            builder = Builder(
-                rsa_private_key=hook.project.rsa_private_key,
-                passphrase=hook.project.passphrase,
-                clone_url=hook.project.gh_clone_url,
-                commit_sha=hook_call.build.gh_commit_sha,
-                docker_image=docker_image,
-                build_script=hook.build_script,
-                build_dir=build_dir,
-                message_queue=message_queue)
-
             # Start Builder and wait until it will not start the container
             builder.start()
             container = message_queue.get(block=True, timeout=60)
@@ -369,26 +354,33 @@ def _do_job(task_request, hook_call, channel):
                 redis_client=redis_client,
                 channel=channel,
                 container=container,
-                kill_timeout=config['KOZMIC_STALL_TIMEOUT'])
-            # Tailer is a daemon process. Stop it when Celery task
-            # quits by binding a finalizer on Celery task context
-            f = multiprocessing.util.Finalize(task_request, tailer.stop)
+                kill_timeout=stall_timeout)
             tailer.start()
-
-            # Tell Builder to continue and wait for it to finish
-            message_queue.task_done()
-            builder.join()
-
-            stdout = ''
-            if os.path.exists(log_path):
-                with open(log_path, 'r') as log:
-                    stdout = log.read()
+            try:
+                # Tell Builder to continue and wait for it to finish
+                message_queue.task_done()
+                builder.join()
+            finally:
+                tailer.stop()
         finally:
             # Always remove `channel` key to let `tailer` module
             # stop listening pubsub channel
             redis_client.delete(channel)
 
-    return builder.return_code, builder.exc_info, stdout
+            stdout = ''
+            if os.path.exists(log_path):
+                with open(log_path, 'r') as log:
+                    stdout = log.read()
+
+            assert (builder.return_code is not None or
+                    builder.exc_info is not None)
+            if builder.exc_info:
+                stdout += ('\nSorry, something went wrong. We are notified of '
+                           'the issue and will fix it soon.')
+                yield 1, stdout
+                raise builder.exc_info[1], None, builder.exc_info[2]
+            else:
+                yield builder.return_code, stdout
 
 
 class RestartError(Exception):
@@ -432,16 +424,25 @@ def do_job(hook_call_id):
     job.started()
     db.session.commit()
 
-    return_code, exc_info, stdout = _do_job(
-        do_job.request, hook_call, job.task_uuid)
-    if exc_info:
-        job.finished(1)
-        stdout += ('\nSorry, something went wrong. We are notified of the '
-                   'issue and we will fix it soon.')
-    else:
-        job.finished(return_code)
-    job.stdout = stdout
-    db.session.commit()
+    hook = hook_call.hook
+    config = current_app.config
+    redis_client = redis.StrictRedis(host=config['KOZMIC_REDIS_HOST'],
+                                     port=config['KOZMIC_REDIS_PORT'],
+                                     db=config['KOZMIC_REDIS_DATABASE'])
 
-    if exc_info:
-        raise exc_info[1], None, exc_info[2]
+    kwargs = dict(
+        redis_client=redis_client,
+        channel=job.task_uuid,
+        stall_timeout=config['KOZMIC_STALL_TIMEOUT'],
+        rsa_private_key=hook.project.rsa_private_key,
+        passphrase=hook.project.passphrase,
+        clone_url=hook.project.gh_clone_url,
+        commit_sha=hook_call.build.gh_commit_sha,
+        docker_image=hook.docker_image)
+
+    with _run(script=hook.build_script,
+              remove_container=True,
+              **kwargs) as (return_code, stdout):
+        job.finished(return_code)
+        job.stdout = stdout
+        db.session.commit()

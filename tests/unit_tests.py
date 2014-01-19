@@ -343,7 +343,7 @@ class TestTailer(TestCase):
                     time.sleep(2)
                     kill_container_mock.assert_called_once_with()
 
-            message = 'Sorry, your build has stalled and been killed.\n'
+            message = 'Sorry, your script has stalled and been killed.\n'
             assert message in f.read()
             publish_mock.assert_called_once_with([message])
 
@@ -386,8 +386,8 @@ class TestBuilder(TestCase):
                 rsa_private_key=private_key,
                 passphrase=passphrase,
                 docker_image='aromanovich/ubuntu-kozmic',
-                build_script='#!/bin/bash\nbash ./kozmic.sh',
-                build_dir=build_dir,
+                script='#!/bin/bash\nbash ./kozmic.sh',
+                working_dir=build_dir,
                 clone_url='/kozmic/test-repo',
                 commit_sha=commit_sha,
                 message_queue=message_queue)
@@ -397,7 +397,7 @@ class TestBuilder(TestCase):
             message_queue.task_done()
             builder.join()
 
-            log_path = os.path.join(build_dir, 'build.log')
+            log_path = os.path.join(build_dir, 'script.log')
             with open(log_path, 'r') as log:
                 stdout = log.read().strip()
 
@@ -417,8 +417,8 @@ class TestBuilder(TestCase):
                 rsa_private_key=self._generate_private_key('passphrase'),
                 passphrase='wrong-passphrase',
                 docker_image='aromanovich/ubuntu-kozmic',
-                build_script='#!/bin/bash\nbash ./kozmic.sh',
-                build_dir=build_dir,
+                script='#!/bin/bash\nbash ./kozmic.sh',
+                working_dir=build_dir,
                 clone_url='/kozmic/test-repo',
                 commit_sha=commit_sha,
                 message_queue=mock.MagicMock())
@@ -432,9 +432,9 @@ class BuilderStub(kozmic.builds.tasks.Builder):
 
         self._message_queue.put({'Id': 'qwerty'}, block=True, timeout=60)
 
-        build_log_path = os.path.join(self._build_dir, 'build.log')
-        with open(build_log_path, 'w') as build_log:
-            build_log.write('Everything went great!\nGood bye.')
+        log_path = os.path.join(self._working_dir, 'script.log')
+        with open(log_path, 'w') as log:
+            log.write('Everything went great!\nGood bye.')
 
         self.return_code = 0
 
@@ -498,20 +498,22 @@ class TestBuildTaskDB(TestCase):
 
         with SessionScope(self.db):
             set_status_patcher = mock.patch.object(Build, 'set_status')
-            _do_job_patcher = mock.patch('kozmic.builds.tasks._do_job',
-                                         return_value=(0, None, 'output'))
+            _run_patcher = mock.patch('kozmic.builds.tasks._run')
 
             set_status_mock = set_status_patcher.start()
-            _do_job_mock = _do_job_patcher.start()
+            _run_mock = _run_patcher.start()
+            _run_mock.return_value.__enter__ = mock.MagicMock(
+                side_effect=lambda *args, **kwargs: (0, 'output'))
             try:
                 kozmic.builds.tasks.restart_job(job.id)
             finally:
-                _do_job_mock.stop()
+                _run_mock.stop()
                 set_status_patcher.stop()
         self.db.session.rollback()
 
         assert self.build.jobs.count() == 1
-        assert _do_job_mock.called
+        assert _run_mock.called
+        assert _run_mock.return_value.__enter__.called
 
         job = self.build.jobs.first()
         assert job_id_before_restart != job.id
