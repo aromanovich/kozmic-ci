@@ -6,6 +6,7 @@ import tempfile
 import subprocess
 import Queue
 import datetime as dt
+import hashlib
 
 import httpretty
 import pytest
@@ -19,7 +20,7 @@ from flask.ext.webtest import SessionScope
 import kozmic.builds.tasks
 import kozmic.builds.views
 from kozmic import mail
-from kozmic.models import db, Membership, User, Project, Build
+from kozmic.models import db, Membership, User, Project, Build, TrackedFile
 from . import TestCase, factories, unit_fixtures as fixtures, func_fixtures
 
 
@@ -334,7 +335,6 @@ class TestTailer(TestCase):
                 container={'Id': '564fe66af3aa755d79797e1'},
                 kill_timeout=2)
 
-
             with mock.patch.object(tailer, '_kill_container') as kill_container_mock:
                 with mock.patch.object(tailer, '_publish') as publish_mock:
                     tailer.start()
@@ -423,7 +423,6 @@ class TestBuilder(TestCase):
                 commit_sha=commit_sha,
                 message_queue=mock.MagicMock())
             builder.run()
-
         assert builder.return_code == 1
 
 
@@ -440,7 +439,7 @@ class BuilderStub(kozmic.builds.tasks.Builder):
         self.return_code = 0
 
 
-class TestBuildTask(TestCase):
+class TestBuildTaskDB(TestCase):
     def setup_method(self, method):
         TestCase.setup_method(self, method)
 
@@ -518,3 +517,74 @@ class TestBuildTask(TestCase):
         assert job_id_before_restart != job.id
         assert job.return_code == 0
         assert job.stdout == 'output'
+
+
+class TestJobDB(TestCase):
+    def setup_method(self, method):
+        TestCase.setup_method(self, method)
+
+        self.user = factories.UserFactory.create()
+        self.project = factories.ProjectFactory.create(owner=self.user)
+        self.hook = factories.HookFactory.create(
+            project=self.project,
+            install_script='#!/bin/bash\npip install -r reqs.txt')
+        self.build = factories.BuildFactory.create(project=self.project)
+        self.hook_call = factories.HookCallFactory.create(
+            hook=self.hook, build=self.build)
+        self.job = factories.JobFactory.create(
+            build=self.build, hook_call=self.hook_call)
+
+    @mock.patch.object(Project, 'gh')
+    def test_get_cache_id_changes_when_tracked_file_changes(self, gh_mock):
+        self.hook.tracked_files.delete()
+        self.hook.tracked_files.extend([
+            TrackedFile(path='requirements/basic.txt'),
+            TrackedFile(path='requirements/dev.txt'),
+        ])
+        db.session.flush()
+
+        def contents_old(path, ref=None):
+            rv = mock.MagicMock()
+            rv.sha = hashlib.sha256(path).hexdigest()
+            return rv
+
+        gh_mock.contents.side_effect = contents_old
+        cache_id_1 = self.job.get_cache_id()
+        assert gh_mock.contents.call_args_list == [
+            mock.call('requirements/basic.txt', ref=self.build.gh_commit_sha),
+            mock.call('requirements/dev.txt', ref=self.build.gh_commit_sha),
+        ]
+
+        def contents_new(path, ref=None):
+            rv = mock.MagicMock()
+            if path == 'requirements/basic.txt':
+                path += 'new content'
+            rv.sha = hashlib.sha256(path).hexdigest()
+            return rv
+
+        gh_mock.contents.side_effect = contents_new
+        cache_id_2 = self.job.get_cache_id()
+
+        assert cache_id_1 != cache_id_2
+
+    @mock.patch.object(Project, 'gh')
+    def test_get_cache_id_changes_when_image_or_script_changes(self, _):
+        seen_cache_ids = set()
+
+        self.hook.install_script = ('#!/bin/bash\n'
+                                    'pip install -r reqs.txt')
+        cache_id = self.job.get_cache_id()
+        assert cache_id not in seen_cache_ids
+        seen_cache_ids.add(cache_id)
+
+        self.hook.install_script = ('#!/bin/bash\n'
+                                    'apt-get install python-mysql\n'
+                                    'pip install reqs.txt')
+        cache_id = self.job.get_cache_id()
+        assert cache_id not in seen_cache_ids
+        seen_cache_ids.add(cache_id)
+
+        self.hook.docker_image = 'kozmic/debian'
+        cache_id = self.job.get_cache_id()
+        assert cache_id not in seen_cache_ids
+        seen_cache_ids.add(cache_id)

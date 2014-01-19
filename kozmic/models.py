@@ -292,14 +292,31 @@ class Hook(db.Model):
     gh_id = db.Column(db.Integer, nullable=False)
     #: Title
     title = db.Column(db.String(200), nullable=False)
+    #: Install script
+    install_script = db.Column(db.Text)
     #: Script to be run at hook call
     build_script = db.Column(db.Text, nullable=False)
-    #: Name of a docker image to run build script in
+    #: Name of a Docker image to run build script in
     #: (for example, "ubuntu" or "aromanovich/ubuntu-kozmic").
     #: Specified docker image is pulled from index.docker.io before build
     docker_image = db.Column(db.String(200), nullable=False)
     #: Project
     project = db.relationship(Project, backref=db.backref('hooks', lazy='dynamic'))
+
+
+class TrackedFile(db.Model):
+    __table_args__ = (
+        db.UniqueConstraint('hook_id', 'path',
+                            name='unique_tracked_file_within_hook'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    hook_id = db.Column(db.Integer, db.ForeignKey('hook.id'), nullable=False)
+
+    #: Path
+    path = db.Column(db.String(250), nullable=False)
+    #: Hook
+    hook = db.relationship(Hook, backref=db.backref('tracked_files', lazy='dynamic'))
 
 
 class Build(db.Model):
@@ -454,6 +471,18 @@ class Job(db.Model):
 
     def __repr__(self):
         return u'<Job #{0.id}>'.format(self)
+
+    def get_cache_id(self):
+        hook = self.hook_call.hook
+        gh = self.build.project.gh
+        commit_sha = self.build.gh_commit_sha
+
+        hash_parts = [hook.docker_image, hook.install_script]
+        for tracked_file in hook.tracked_files.order_by(TrackedFile.path):
+            data = gh.contents(tracked_file.path, ref=commit_sha)
+            hash_parts.append(tracked_file.path + (data.sha if data else ''))
+
+        return hashlib.sha256(''.join(hash_parts)).hexdigest()
 
     def started(self):
         """Sets :attr:`started_at` and updates :attr:`build` status.
