@@ -188,6 +188,7 @@ class TestHooksManagement(TestCase):
         # Fill the hook creation form
         hook_data = {
             'title': 'Tests on debian-7',
+            'install_script': '#!/bin/bash\r\necho 123 > /test.txt',
             'build_script': '#!/bin/bash\r\n./kozmic.sh',
             'docker_image': 'debian-7',
         }
@@ -206,6 +207,7 @@ class TestHooksManagement(TestCase):
         assert self.project.hooks.count() == 1
         hook = self.project.hooks.first()
         assert hook.title == hook_data['title']
+        assert hook.install_script == '#!/bin/bash\necho 123 > /test.txt'
         assert hook.build_script == '#!/bin/bash\n./kozmic.sh'
         assert hook.docker_image == hook_data['docker_image']
 

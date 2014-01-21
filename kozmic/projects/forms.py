@@ -32,9 +32,15 @@ class TrackedFilesField(wtforms.TextAreaField):
         setattr(obj, name, self.data)
 
 
+class UnixEndingsTextAreaField(wtforms.TextAreaField):
+    def process_formdata(self, valuelist):
+        valuelist = ['\n'.join(value.splitlines()) for value in valuelist]
+        return super(UnixEndingsTextAreaField, self).process_formdata(valuelist)
+
+
 class HookForm(wtf.Form):
     title = wtforms.TextField('Title *', [required])
-    install_script = wtforms.TextAreaField(
+    install_script = UnixEndingsTextAreaField(
         'Install script', [optional],
         description='Install build dependencies here.<br><br>' + shebang_reminder)
     tracked_files = TrackedFilesField(
@@ -45,7 +51,7 @@ class HookForm(wtf.Form):
                     'the tracked files change.\nRemember to list here all the '
                     'files used by install script (such as pip\'s requirements.txt, '
                     'Gemfile, etc).')
-    build_script = wtforms.TextAreaField(
+    build_script = UnixEndingsTextAreaField(
         'Build script *', [required], description=shebang_reminder)
     docker_image = wtforms.TextField(
         'Docker image *', [required],
