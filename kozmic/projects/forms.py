@@ -35,10 +35,12 @@ class TrackedFilesField(wtforms.TextAreaField):
 class HookForm(wtf.Form):
     title = wtforms.TextField('Title *', [required])
     install_script = wtforms.TextAreaField(
-        'Install script', [optional], description=shebang_reminder)
+        'Install script', [optional],
+        description='Install build dependencies here.<br><br>' + shebang_reminder)
     tracked_files = TrackedFilesField(
         'Tracked files', [optional],
-        description='Results of the install script are cached. The cache is invalidated '
+        description='Enter one path per line, the order doesn\'t matter.<br><br>'
+                    'Results of the install script are cached. The cache is invalidated '
                     'whenever the base Docker image, the install script or any of '
                     'the tracked files change.\nRemember to list here all the '
                     'files used by install script (such as pip\'s requirements.txt, '
