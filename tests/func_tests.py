@@ -10,7 +10,8 @@ import github3.git
 from flask import url_for
 
 import kozmic.builds.tasks
-from kozmic.models import User, Project, Membership, Hook, HookCall, Build, Job
+from kozmic.models import (User, Project, Membership, Hook, HookCall,
+                           Build, Job, TrackedFile)
 from . import TestCase, func_fixtures as fixtures
 from . import factories, unit_tests
 
@@ -302,6 +303,44 @@ class TestHooksManagement(TestCase):
         gh_repo_mock.hook.assert_called_once_with(hook_2.gh_id)
         # ...and then called `delete` on it
         gh_hook_mock.delete.assert_called_once_with()
+
+    def test_manager_can_change_tracked_files_in_hook_settings(self):
+        """Manager can change the traked files."""
+        hook = factories.HookFactory.create(project=self.project)
+        self.login(user_id=self.user.id)
+        settings_page = self.get_project_settings_page(self.project)
+        link_id = 'edit-hook-{}'.format(hook.id)
+
+        hook_form = settings_page.click(linkid=link_id).form
+        hook_form['tracked_files'] = ''
+        hook_form.submit()
+
+        assert not hook.tracked_files.all()
+
+        hook_form = settings_page.click(linkid=link_id).form
+        hook_form['tracked_files'] = 'requirements/basic.txt\nrequirements/dev.txt'
+        hook_form.submit()
+
+        assert set(tracked_file.path for tracked_file in hook.tracked_files) == {
+            'requirements/basic.txt',
+            'requirements/dev.txt',
+        }
+
+        hook_form = settings_page.click(linkid=link_id).form
+        assert set(hook_form['tracked_files'].value.splitlines()) == {
+            'requirements/basic.txt',
+            'requirements/dev.txt',
+        }
+        hook_form['tracked_files'] = (hook_form['tracked_files'].value +
+                                      '\nPumpurum.txt\npumpurum.txt')
+        hook_form.submit()
+
+        assert set(tracked_file.path for tracked_file in hook.tracked_files) == {
+            'requirements/basic.txt',
+            'requirements/dev.txt',
+            'pumpurum.txt',
+            'Pumpurum.txt',
+        }
 
 
 class TestMembersManagement(TestCase):

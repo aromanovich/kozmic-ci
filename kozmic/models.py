@@ -314,7 +314,8 @@ class TrackedFile(db.Model):
     hook_id = db.Column(db.Integer, db.ForeignKey('hook.id'), nullable=False)
 
     #: Path
-    path = db.Column(db.String(250), nullable=False)
+    # Specify utf8_bin for case-sensitive collation
+    path = db.Column(db.String(250, collation='utf8_bin'), nullable=False)
     #: Hook
     hook = db.relationship(Hook, backref=db.backref('tracked_files', lazy='dynamic'))
 
