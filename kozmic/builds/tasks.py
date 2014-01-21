@@ -188,10 +188,11 @@ rm /kozmic/askpass.sh /kozmic/id_rsa
 git clone {clone_url} /kozmic/src
 cd /kozmic/src && git checkout -q {commit_sha}
 
-# XXX
-# groupadd -f admin
-# useradd -m -d /home/kozmic -G admin -s /bin/bash kozmic
-# /XXX
+if [ -z $(getent passwd kozmic) ] ; then
+  groupadd -f admin
+  useradd -m -d /home/kozmic -G admin -s /bin/bash kozmic
+fi
+
 chown -R kozmic /kozmic
 # Redirect stdout to the file being translated to the redis pubsub channel
 TERM=xterm su kozmic -c "/kozmic/script.sh" &>> /kozmic/script.log
