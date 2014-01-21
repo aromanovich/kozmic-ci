@@ -20,7 +20,6 @@ import subprocess
 import fcntl
 import select
 import Queue
-from contextlib import contextmanager
 
 import tailf
 import docker
@@ -95,7 +94,10 @@ class Tailer(threading.Thread):
         for line in lines:
             line = self._ansi_converter.convert(line, full=False) + '\n'
             self._redis_client.publish(self._channel, line)
-            self._redis_client.rpush(self._channel, line)
+            self._backlog(line)
+
+    def _backlog(self, line):
+        self._redis_client.rpush(self._channel, line)
 
     def _kill_container(self):
         client = docker.Client()
@@ -107,7 +109,14 @@ class Tailer(threading.Thread):
         logger.info(
             'Tailer has started. Log path: %s; channel name: %s.',
             self._log_path, self._channel)
-        tailf = subprocess.Popen(['/usr/bin/tail', '-f', self._log_path],
+
+        # Publish the lines that already was in the file:
+        with open(self._log_path) as log:
+            log_lines = log.read().splitlines()
+            for line in log_lines:
+                self._backlog(line)
+
+        tailf = subprocess.Popen(['/usr/bin/tail', '--lines', '0', '-f', self._log_path],
                                  stdout=subprocess.PIPE)
         try:
             fl = fcntl.fcntl(tailf.stdout, fcntl.F_GETFL)
@@ -179,11 +188,13 @@ rm /kozmic/askpass.sh /kozmic/id_rsa
 git clone {clone_url} /kozmic/src
 cd /kozmic/src && git checkout -q {commit_sha}
 
-groupadd -f admin
-useradd -m -d /home/kozmic -G admin -s /bin/bash kozmic
+# XXX
+# groupadd -f admin
+# useradd -m -d /home/kozmic -G admin -s /bin/bash kozmic
+# /XXX
 chown -R kozmic /kozmic
 # Redirect stdout to the file being translated to the redis pubsub channel
-TERM=xterm su kozmic -c "/kozmic/script.sh" &> /kozmic/script.log
+TERM=xterm su kozmic -c "/kozmic/script.sh" &>> /kozmic/script.log
 '''.strip()
 
 ASKPASS_SH = '''
@@ -324,63 +335,68 @@ class Builder(threading.Thread):
         return return_code
 
 
-@contextmanager
+@contextlib.contextmanager
 def _run(redis_client, channel, stall_timeout,
          rsa_private_key, passphrase, clone_url, commit_sha,
-         docker_image, script,
-         remove_container=True):
+         docker_image, script, remove_container=True, remove_channel=True,
+         init_stdout=''):
+    stdout = ''
+    try:
+        with create_temp_dir() as working_dir:
+            message_queue = Queue.Queue()
+            builder = Builder(
+                rsa_private_key=rsa_private_key,
+                passphrase=passphrase,
+                clone_url=clone_url,
+                commit_sha=commit_sha,
+                docker_image=docker_image,
+                script=script,
+                working_dir=working_dir,
+                message_queue=message_queue,
+                remove_container=remove_container)
 
-    with create_temp_dir() as working_dir:
-        message_queue = Queue.Queue()
-        builder = Builder(
-            rsa_private_key=rsa_private_key,
-            passphrase=passphrase,
-            clone_url=clone_url,
-            commit_sha=commit_sha,
-            docker_image=docker_image,
-            script=script,
-            working_dir=working_dir,
-            message_queue=message_queue,
-            remove_container=remove_container)
-        log_path = os.path.join(working_dir, 'script.log')
-        try:
-            # Start Builder and wait until it will not start the container
-            builder.start()
-            container = message_queue.get(block=True, timeout=60)
-
-            # Now the container id is known and we can pass it to Tailer
-            tailer = Tailer(
-                log_path=log_path,
-                redis_client=redis_client,
-                channel=channel,
-                container=container,
-                kill_timeout=stall_timeout)
-            tailer.start()
+            log_path = os.path.join(working_dir, 'script.log')
             try:
-                # Tell Builder to continue and wait for it to finish
-                message_queue.task_done()
-                builder.join()
+                # Start Builder and wait until it will create the container
+                builder.start()
+                container = message_queue.get(block=True, timeout=60)
+                with open(log_path, 'w') as log:
+                    log.write(init_stdout)
+
+                # Now the container id is known and we can pass it to Tailer
+                tailer = Tailer(
+                    log_path=log_path,
+                    redis_client=redis_client,
+                    channel=channel,
+                    container=container,
+                    kill_timeout=stall_timeout)
+                tailer.start()
+                try:
+                    # Tell Builder to continue and wait for it to finish
+                    message_queue.task_done()
+                    builder.join()
+                finally:
+                    tailer.stop()
             finally:
-                tailer.stop()
-        finally:
-            # Always remove `channel` key to let `tailer` module
-            # stop listening pubsub channel
-            redis_client.delete(channel)
+                if remove_channel:
+                    # Remove `channel` key to let `tailer` module
+                    # stop listening pubsub channel
+                    redis_client.delete(channel)
 
-            stdout = ''
-            if os.path.exists(log_path):
-                with open(log_path, 'r') as log:
-                    stdout = log.read()
+                if os.path.exists(log_path):
+                    with open(log_path, 'r') as log:
+                        stdout = log.read()
 
-            assert (builder.return_code is not None or
-                    builder.exc_info is not None)
-            if builder.exc_info:
-                stdout += ('\nSorry, something went wrong. We are notified of '
-                           'the issue and will fix it soon.')
-                yield 1, stdout
-                raise builder.exc_info[1], None, builder.exc_info[2]
-            else:
-                yield builder.return_code, stdout
+                assert ((builder.return_code is not None) ^
+                        (builder.exc_info is not None))
+                if builder.exc_info:
+                    raise builder.exc_info[1], None, builder.exc_info[2]
+                yield builder.return_code, stdout, builder.container
+    except:
+        stdout += ('\nSorry, something went wrong. We are notified of '
+                   'the issue and will fix it soon.')
+        yield 1, stdout, None
+        raise
 
 
 class RestartError(Exception):
@@ -437,12 +453,55 @@ def do_job(hook_call_id):
         rsa_private_key=hook.project.rsa_private_key,
         passphrase=hook.project.passphrase,
         clone_url=hook.project.gh_clone_url,
-        commit_sha=hook_call.build.gh_commit_sha,
-        docker_image=hook.docker_image)
+        commit_sha=hook_call.build.gh_commit_sha)
 
-    with _run(script=hook.build_script,
-              remove_container=True,
-              **kwargs) as (return_code, stdout):
-        job.finished(return_code)
-        job.stdout = stdout
+    client = docker.Client()
+    logger.info('Pulling %s image...', hook.docker_image)
+    try:
+        client.pull(hook.docker_image)
+        # Make sure that image has been successfully pulled by calling
+        # `inspect_image` on it:
+        client.inspect_image(hook.docker_image)
+    except docker.APIError as e:
+        logger.info('Failed to pull %s: %s.', hook.docker_image, e)
+        job.finished(1)
+        job.stdout = str(e)
         db.session.commit()
+        return
+    else:
+        logger.info('%s image has been pulled.', hook.docker_image)
+
+    install_stdout = ''
+    if job.hook_call.hook.install_script:
+        cached_image = 'kozmic-cache/{}'.format(job.get_cache_id())
+        if client.images(cached_image):
+            install_stdout = ('Skipping install script as tracked files '
+                              'did not change...\n\n')
+        else:
+            with _run(docker_image=hook.docker_image,
+                      script=hook.install_script,
+                      remove_container=False,
+                      remove_channel=False,
+                      **kwargs) as (return_code, install_stdout, container):
+                if return_code == 0:
+                    client.commit(container['Id'], repository=cached_image)
+                    client.remove_container(container)
+                else:
+                    job.finished(return_code)
+                    job.stdout = install_stdout
+                    db.session.commit()
+                    return
+            assert client.images(cached_image)
+        docker_image = cached_image
+    else:
+        docker_image = job.hook_call.hook.docker_image
+
+    with _run(docker_image=docker_image,
+              script=hook.build_script,
+              init_stdout=install_stdout,
+              remove_container=True,
+              **kwargs) as (return_code, build_stdout, container):
+        job.finished(return_code)
+        job.stdout = build_stdout
+        db.session.commit()
+        return

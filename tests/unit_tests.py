@@ -3,7 +3,6 @@ import os
 import time
 import unittest
 import tempfile
-import subprocess
 import Queue
 import datetime as dt
 import hashlib
@@ -12,7 +11,6 @@ import httpretty
 import pytest
 import redis
 import mock
-from Crypto.PublicKey import RSA
 from flask import current_app
 from flask.ext.principal import Need
 from flask.ext.webtest import SessionScope
@@ -21,7 +19,7 @@ import kozmic.builds.tasks
 import kozmic.builds.views
 from kozmic import mail
 from kozmic.models import db, Membership, User, Project, Build, TrackedFile
-from . import TestCase, factories, unit_fixtures as fixtures, func_fixtures
+from . import TestCase, factories, func_fixtures, utils, unit_fixtures as fixtures
 
 
 class TestUser(unittest.TestCase):
@@ -348,48 +346,24 @@ class TestTailer(TestCase):
             publish_mock.assert_called_once_with([message])
 
 
-CREATE_TEST_REPO_SH = '''
-git init {repo_dir}
-cd {repo_dir}
-git config user.email "author@example.com>"
-git config user.name "A U Thore"
-echo "echo Hello!" > ./kozmic.sh
-git add ./kozmic.sh
-git commit -m "Initial commit"
-'''
-
-
 @pytest.mark.docker
 class TestBuilder(TestCase):
-    def _init_repo(self, repo_dir):
-        subprocess.call(
-            CREATE_TEST_REPO_SH.format(repo_dir=repo_dir), shell=True,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return subprocess.check_output(
-            'cd {} && git rev-parse HEAD'.format(repo_dir),
-            shell=True
-        ).strip()
-
-    def _generate_private_key(self, passphrase):
-        rsa_key = RSA.generate(1024)
-        return rsa_key.exportKey(format='PEM', passphrase=passphrase)
-
     def test_builder(self):
         passphrase = 'passphrase'
-        private_key = self._generate_private_key(passphrase)
+        private_key = utils.generate_private_key(passphrase)
 
         with kozmic.builds.tasks.create_temp_dir() as build_dir:
-            commit_sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
+            head_sha = utils.create_git_repo(os.path.join(build_dir, 'test-repo'))
 
             message_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
                 rsa_private_key=private_key,
                 passphrase=passphrase,
-                docker_image='aromanovich/ubuntu-kozmic',
+                docker_image='kozmic/ubuntu-base:12.04',
                 script='#!/bin/bash\nbash ./kozmic.sh',
                 working_dir=build_dir,
                 clone_url='/kozmic/test-repo',
-                commit_sha=commit_sha,
+                commit_sha=head_sha,
                 message_queue=message_queue)
             builder.start()
             container = message_queue.get(True, 60)
@@ -410,17 +384,17 @@ class TestBuilder(TestCase):
         with a wrong passphrase.
         """
         with kozmic.builds.tasks.create_temp_dir() as build_dir:
-            commit_sha = self._init_repo(os.path.join(build_dir, 'test-repo'))
+            head_sha = utils.create_git_repo(os.path.join(build_dir, 'test-repo'))
 
             message_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
-                rsa_private_key=self._generate_private_key('passphrase'),
+                rsa_private_key=utils.generate_private_key('passphrase'),
                 passphrase='wrong-passphrase',
                 docker_image='aromanovich/ubuntu-kozmic',
                 script='#!/bin/bash\nbash ./kozmic.sh',
                 working_dir=build_dir,
                 clone_url='/kozmic/test-repo',
-                commit_sha=commit_sha,
+                commit_sha=head_sha,
                 message_queue=mock.MagicMock())
             builder.run()
         assert builder.return_code == 1
@@ -431,9 +405,10 @@ class BuilderStub(kozmic.builds.tasks.Builder):
         time.sleep(1)
 
         self._message_queue.put({'Id': 'qwerty'}, block=True, timeout=60)
+        self._message_queue.join()
 
         log_path = os.path.join(self._working_dir, 'script.log')
-        with open(log_path, 'w') as log:
+        with open(log_path, 'a') as log:
             log.write('Everything went great!\nGood bye.')
 
         self.return_code = 0
@@ -503,7 +478,7 @@ class TestBuildTaskDB(TestCase):
             set_status_mock = set_status_patcher.start()
             _run_mock = _run_patcher.start()
             _run_mock.return_value.__enter__ = mock.MagicMock(
-                side_effect=lambda *args, **kwargs: (0, 'output'))
+                side_effect=lambda *args, **kwargs: (0, 'output', {'Id': 'container-id'}))
             try:
                 kozmic.builds.tasks.restart_job(job.id)
             finally:
