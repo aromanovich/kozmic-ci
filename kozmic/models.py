@@ -274,7 +274,7 @@ class Project(db.Model):
 
     def get_latest_build(self, ref=None):
         """
-        :type: :class:`Build`
+        :rtype: :class:`Build`
         """
         builds = self.builds.order_by(Build.number.desc())
         if ref:
@@ -305,6 +305,7 @@ class Hook(db.Model):
 
 
 class TrackedFile(db.Model):
+    """Reflecs a :term:`tracked file`."""
     __table_args__ = (
         db.UniqueConstraint('hook_id', 'path',
                             name='unique_tracked_file_within_hook'),
@@ -313,15 +314,16 @@ class TrackedFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     hook_id = db.Column(db.Integer, db.ForeignKey('hook.id'), nullable=False)
 
-    #: Path
+    #: Path within git repository
     # Specify utf8_bin for case-sensitive collation
     path = db.Column(db.String(250, collation='utf8_bin'), nullable=False)
     #: Hook
-    hook = db.relationship(Hook, backref=db.backref('tracked_files', lazy='dynamic'))
+    hook = db.relationship(
+        Hook, backref=db.backref('tracked_files', lazy='dynamic', cascade='all'))
 
 
 class Build(db.Model):
-    """Reflects a project commit that called a project hook."""
+    """Reflects a project commit that triggered a project hook."""
     __table_args__ = (
         db.UniqueConstraint('project_id', 'gh_commit_ref', 'gh_commit_sha',
                             name='unique_ref_and_sha_within_project'),
@@ -474,6 +476,11 @@ class Job(db.Model):
         return u'<Job #{0.id}>'.format(self)
 
     def get_cache_id(self):
+        """Returns a string that can be used for tagging a Docker image
+        built from the install script.
+        A cache id changes whenever the base Docker image, the install
+        script or any of the :term:`tracked files` is changed.
+        """
         hook = self.hook_call.hook
         gh = self.build.project.gh
         commit_sha = self.build.gh_commit_sha
