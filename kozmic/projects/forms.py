@@ -1,4 +1,6 @@
 # coding: utf-8
+import os.path
+
 import wtforms
 from flask.ext import wtf
 
@@ -22,8 +24,10 @@ class TrackedFilesField(wtforms.TextAreaField):
         assert len(valuelist) == 1
         value = valuelist.pop()
         if value:
-            value = [TrackedFile(path=path)
-                     for path in set(filter(bool, value.splitlines()))]
+            # Normalize and keep only unique paths to provide better UI
+            paths = set(os.path.relpath(path, start='.')
+                        for path in value.splitlines() if path)
+            value = [TrackedFile(path=path) for path in paths]
         valuelist.append(value)
         return super(TrackedFilesField, self).process_formdata(valuelist)
 
@@ -45,7 +49,8 @@ class HookForm(wtf.Form):
         description='Install build dependencies here.<br><br>' + shebang_reminder)
     tracked_files = TrackedFilesField(
         'Tracked files', [optional],
-        description='Enter one path per line, the order doesn\'t matter.<br><br>'
+        description='Enter one path per line, the order doesn\'t matter.'
+                    'Tracked files may include both regular files and directories.<br><br>'
                     'Results of the install script are cached. The cache is invalidated '
                     'whenever the base Docker image, the install script or any of '
                     'the tracked files change.\nRemember to list here all the '

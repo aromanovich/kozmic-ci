@@ -6,6 +6,7 @@ kozmic.models
 import datetime
 import collections
 import hashlib
+import os.path
 
 import github3
 import sqlalchemy.dialects.mysql
@@ -487,8 +488,28 @@ class Job(db.Model):
 
         hash_parts = [hook.docker_image, hook.install_script]
         for tracked_file in hook.tracked_files.order_by(TrackedFile.path):
-            data = gh.contents(tracked_file.path, ref=commit_sha)
-            hash_parts.append(tracked_file.path + (data.sha if data else ''))
+            path = tracked_file.path
+            # GitHub API wants to see paths relative to the repo directory
+            # ("./basic.txt" does not work, whereas "basic.txt" does)
+            path = os.path.relpath(path, start='.')
+            if path == '.':
+                # Special case: os.path.relpath('.', start='.') returns ".",
+                # but GitHub API wants to see "/" or "".
+                path = ''
+
+            contents = gh.contents(path, ref=commit_sha)
+            if isinstance(contents, dict):
+                # `contents` represents a directory. Add all its entries
+                # to the hash
+                for file_path, file_contents in contents.iteritems():
+                    hash_parts.append(file_path + file_contents.sha)
+            elif contents:
+                # `contents` represents a regular file
+                hash_parts.append(path + contents.sha)
+            else:
+                # `path` does not exist. But it's still necessary to include
+                # it in the hash to be able to detect file removals
+                hash_parts.append(path)
 
         return hashlib.sha256(''.join(hash_parts)).hexdigest()
 

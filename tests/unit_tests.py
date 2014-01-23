@@ -390,7 +390,7 @@ class TestBuilder(TestCase):
             builder = kozmic.builds.tasks.Builder(
                 rsa_private_key=utils.generate_private_key('passphrase'),
                 passphrase='wrong-passphrase',
-                docker_image='aromanovich/ubuntu-kozmic',
+                docker_image='kozmic/ubuntu-base:12.04',
                 script='#!/bin/bash\nbash ./kozmic.sh',
                 working_dir=build_dir,
                 clone_url='/kozmic/test-repo',
@@ -460,6 +460,7 @@ class TestBuildTaskDB(TestCase):
                 description='Kozmic build #{} has passed.'.format(build_id)),
         ])
 
+    @pytest.mark.docker
     def test_restart_build(self):
         job = factories.JobFactory.create(
             build=self.build,
@@ -515,34 +516,61 @@ class TestJobDB(TestCase):
     def test_get_cache_id_changes_when_tracked_file_changes(self, gh_mock):
         self.hook.tracked_files.delete()
         self.hook.tracked_files.extend([
-            TrackedFile(path='requirements/basic.txt'),
-            TrackedFile(path='requirements/dev.txt'),
+            TrackedFile(path='./a/../b/../install.sh'),
+            TrackedFile(path='requirements'),
+            TrackedFile(path='./Gemfile'),
         ])
         db.session.flush()
 
-        def contents_old(path, ref=None):
-            rv = mock.MagicMock()
-            rv.sha = hashlib.sha256(path).hexdigest()
-            return rv
+        dir_entries = ['requirements/basic.txt', 'requirements/dev.txt']
+        deleted_paths = []
 
-        gh_mock.contents.side_effect = contents_old
-        cache_id_1 = self.job.get_cache_id()
+        def contents(path, ref=None):
+            # Mock github3.repo.Repository.contents method
+            if path == 'requirements':
+                # Pretend that "requirements" is a directory
+                return dict(zip(dir_entries, map(contents, dir_entries)))
+            else:
+                # Other paths are regular files, maybe deleted
+                if path in deleted_paths:
+                    return None
+                rv = mock.MagicMock()  # Mock github3.repos.contents.Contents
+                rv.sha = hashlib.sha256(path).hexdigest()
+                return rv
+        gh_mock.contents.side_effect = contents
+
+        seen_cache_ids = set()
+
+        # Compute the cache
+        cache_id = self.job.get_cache_id()
+        assert cache_id not in seen_cache_ids
+        seen_cache_ids.add(cache_id)
+
+        # Make sure that `get_cache_id` asked GitHub API for contents
+        # of all the tracked files using their normalized paths.
+        # Also make sure that calls are made in lexicographical order
         assert gh_mock.contents.call_args_list == [
-            mock.call('requirements/basic.txt', ref=self.build.gh_commit_sha),
-            mock.call('requirements/dev.txt', ref=self.build.gh_commit_sha),
+            mock.call('Gemfile', ref=self.build.gh_commit_sha),
+            mock.call('install.sh', ref=self.build.gh_commit_sha),
+            mock.call('requirements', ref=self.build.gh_commit_sha),
         ]
 
-        def contents_new(path, ref=None):
-            rv = mock.MagicMock()
-            if path == 'requirements/basic.txt':
-                path += 'new content'
-            rv.sha = hashlib.sha256(path).hexdigest()
-            return rv
+        # Add a new file to the tracked directory and
+        # make sure the cache id is changed
+        dir_entries.append('requirements/new-file.txt')
+        cache_id = self.job.get_cache_id()
+        assert cache_id not in seen_cache_ids
+        seen_cache_ids.add(cache_id)
 
-        gh_mock.contents.side_effect = contents_new
-        cache_id_2 = self.job.get_cache_id()
+        # Delete one of the tracked files and make sure the cache id is changed
+        deleted_paths.append('install.sh')
+        cache_id = self.job.get_cache_id()
+        assert cache_id not in seen_cache_ids
+        seen_cache_ids.add(cache_id)
 
-        assert cache_id_1 != cache_id_2
+        # Change nothing and make sure the cache id is not changed
+        cache_id = self.job.get_cache_id()
+        assert cache_id in seen_cache_ids
 
     @mock.patch.object(Project, 'gh')
     def test_get_cache_id_changes_when_image_or_script_changes(self, _):

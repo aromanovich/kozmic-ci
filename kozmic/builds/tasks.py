@@ -115,7 +115,6 @@ class Tailer(threading.Thread):
             log_lines = log.read().splitlines()
             for line in log_lines:
                 self._backlog(line)
-
         tailf = subprocess.Popen(['/usr/bin/tail', '--lines', '0', '-f', self._log_path],
                                  stdout=subprocess.PIPE)
         try:
@@ -391,8 +390,11 @@ def _run(redis_client, channel, stall_timeout,
                 assert ((builder.return_code is not None) ^
                         (builder.exc_info is not None))
                 if builder.exc_info:
+                    # Re-raise exception happened in builder
+                    # (it will be catched in the outer try-except)
                     raise builder.exc_info[1], None, builder.exc_info[2]
-                yield builder.return_code, stdout, builder.container
+                else:
+                    yield builder.return_code, stdout, builder.container
     except:
         stdout += ('\nSorry, something went wrong. We are notified of '
                    'the issue and will fix it soon.')

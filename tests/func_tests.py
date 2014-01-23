@@ -320,7 +320,9 @@ class TestHooksManagement(TestCase):
         assert not hook.tracked_files.all()
 
         hook_form = settings_page.click(linkid=link_id).form
-        hook_form['tracked_files'] = 'requirements/basic.txt\nrequirements/dev.txt'
+        hook_form['tracked_files'] = ('./requirements/basic.txt\n'
+                                      'requirements/basic.txt\n'
+                                      '././a/../requirements/dev.txt')
         hook_form.submit()
 
         assert set(tracked_file.path for tracked_file in hook.tracked_files) == {
