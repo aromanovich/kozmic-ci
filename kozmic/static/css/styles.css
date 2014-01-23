@@ -109,8 +109,10 @@ body {
 
 #install_script, #build_script {
   height: 130px;
+  font-family: monospace;
 }
 
 #tracked_files {
   height: 65px;
+  font-family: monospace;
 }

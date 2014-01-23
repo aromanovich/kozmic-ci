@@ -49,7 +49,7 @@ class HookForm(wtf.Form):
         description='Install build dependencies here.<br><br>' + shebang_reminder)
     tracked_files = TrackedFilesField(
         'Tracked files', [optional],
-        description='Enter one path per line, the order doesn\'t matter.'
+        description='Enter one path per line, the order doesn\'t matter. '
                     'Tracked files may include both regular files and directories.<br><br>'
                     'Results of the install script are cached. The cache is invalidated '
                     'whenever the base Docker image, the install script or any of '
