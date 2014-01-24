@@ -98,7 +98,7 @@ class ProjectFactory(Factory):
     id = factory.Sequence(_identity)
     gh_id = factory.Sequence(_identity)
     gh_name = factory.Sequence(u'project_{}'.format)
-    gh_full_name = factory.Sequence(u'Project {}'.format)
+    gh_full_name = factory.Sequence(u'project_{0}/project_{0}'.format)
     gh_login = factory.Sequence(u'project_{}'.format)
     gh_clone_url = factory.Sequence(u'git://example.com/%d.git'.format)
     gh_key_id = factory.Sequence(_identity)

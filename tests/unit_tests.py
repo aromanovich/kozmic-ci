@@ -6,6 +6,7 @@ import tempfile
 import Queue
 import datetime as dt
 import hashlib
+import json
 
 import httpretty
 import pytest
@@ -22,24 +23,33 @@ from kozmic.models import db, Membership, User, Project, Build, TrackedFile
 from . import TestCase, factories, func_fixtures, utils, unit_fixtures as fixtures
 
 
-class TestUser(unittest.TestCase):
-    @staticmethod
-    @httpretty.httprettified
-    def get_stub_for__get_gh_org_repos():
-        """Returns a stub for :meth:`User.get_gh_org_repos`."""
-
+class TestUserUtils(object):
+    @classmethod
+    def stub_teams_and_their_repos(self):
         httpretty.register_uri(
             httpretty.GET, 'https://api.github.com/user/teams',
-            fixtures.TEAMS_JSON)
-
+            json.dumps([
+                fixtures.TEAM_35885_DATA,
+                fixtures.TEAM_267031_DATA,
+                fixtures.TEAM_297965_DATA,
+            ]))
         httpretty.register_uri(
             httpretty.GET, 'https://api.github.com/teams/267031/repos',
-            fixtures.TEAM_267031_JSON)
-
+            json.dumps(fixtures.TEAM_267031_REPOS_DATA))
         httpretty.register_uri(
             httpretty.GET, 'https://api.github.com/teams/297965/repos',
-            fixtures.TEAM_297965_JSON)
+            json.dumps(fixtures.TEAM_297965_REPOS_DATA))
+        httpretty.register_uri(
+            httpretty.GET, 'https://api.github.com/teams/35885/repos',
+            json.dumps(fixtures.TEAM_35885_REPOS_DATA))
 
+
+class TestUser(unittest.TestCase, TestUserUtils):
+    @classmethod
+    @httpretty.httprettified
+    def get_stub_for__get_gh_org_repos(cls):
+        """Returns a stub for :meth:`User.get_gh_org_repos`."""
+        cls.stub_teams_and_their_repos()
         rv = User(gh_access_token='123').get_gh_org_repos()
         return mock.Mock(return_value=rv)
 
@@ -70,7 +80,7 @@ class TestUser(unittest.TestCase):
         assert len(stub.return_value) == 3
 
 
-class TestUserDB(TestCase):
+class TestUserDB(TestCase, TestUserUtils):
     def setup_method(self, method):
         TestCase.setup_method(self, method)
 
@@ -137,6 +147,112 @@ class TestUserDB(TestCase):
 
         identity = self.user_4.get_identity()
         assert not identity.provides
+
+    @httpretty.httprettified
+    def test_sync_memberships_with_github(self):
+        project_1 = factories.ProjectFactory.create(
+            gh_id=4702522,
+            owner=self.user_1)  # project from team #35885 with pull permission
+        project_2 = factories.ProjectFactory.create(
+            gh_id=7092812,
+            owner=self.user_1)  # project from team #297965 with push permission
+        project_3 = factories.ProjectFactory.create(
+            gh_id=6653170,
+            owner=self.user_1)  # project from team #267031 with admin permission
+
+        self.stub_teams_and_their_repos()
+
+        self.user_2.sync_memberships_with_github()
+        db.session.commit()
+
+        for project, allows_management in [(project_1, False),
+                                           (project_2, True),
+                                           (project_3, True)]:
+            membership = Membership.query.filter_by(
+                project=project, user=self.user_2).first()
+            assert membership.allows_management == allows_management
+
+        # Pretend that team #297965 has dropped permission from push to pull
+        httpretty.register_uri(
+            httpretty.GET, 'https://api.github.com/user/teams',
+            json.dumps([
+                dict(fixtures.TEAM_35885_DATA, permission='push'),
+                dict(fixtures.TEAM_297965_DATA, permission='pull'),
+                dict(fixtures.TEAM_267031_DATA, permission='admin'),
+            ]))
+
+        # And sync memberships again
+        self.user_2.sync_memberships_with_github()
+        db.session.commit()
+
+        for project, allows_management in [(project_1, True),
+                                           (project_2, False),
+                                           (project_3, True)]:
+            membership = Membership.query.filter_by(
+                project=project, user=self.user_2).first()
+            assert membership.allows_management == allows_management
+
+        assert not self.user_3.memberships.first()  # Just in case :)
+
+
+class TestProjectDB(TestCase):
+    def setup_method(self, method):
+        TestCase.setup_method(self, method)
+
+        self.owner = factories.UserFactory.create()
+
+        self.repo_data = fixtures.TEAM_35885_REPOS_DATA[0]
+        self.project = factories.ProjectFactory.create(
+            owner=self.owner,
+            gh_full_name=self.repo_data['full_name'],
+            gh_login=self.repo_data['owner']['login'],
+            gh_name=self.repo_data['name'])
+
+    @httpretty.httprettified
+    def test_sync_memberships_with_github_(self):
+        httpretty.register_uri(
+            httpretty.GET,
+            'https://api.github.com/repos/{}'.format(self.project.gh_full_name),
+            json.dumps(self.repo_data))
+        httpretty.register_uri(
+            httpretty.GET,
+            'https://api.github.com/repos/{}/teams'.format(self.project.gh_full_name),
+            json.dumps([
+                dict(fixtures.TEAM_35885_DATA, permission='admin'),
+                dict(fixtures.TEAM_267031_DATA, permission='pull')
+            ]))
+        httpretty.register_uri(
+            httpretty.GET,
+            'https://api.github.com/teams/35885/members',
+            json.dumps([
+                fixtures.USER_AROMANOVICH_DATA,
+                fixtures.USER_VSOKOLOV_DATA,
+            ]))
+        httpretty.register_uri(
+            httpretty.GET,
+            'https://api.github.com/teams/267031/members',
+            json.dumps([
+                fixtures.USER_AROMANOVICH_DATA,
+                fixtures.USER_RAMM_DATA,
+            ]))
+
+        aromanovich, ramm, vsokolov, john_doe = factories.UserFactory.create_batch(4)
+        aromanovich.gh_id = fixtures.USER_AROMANOVICH_DATA['id']
+        ramm.gh_id = fixtures.USER_RAMM_DATA['id']
+        vsokolov.gh_id = fixtures.USER_VSOKOLOV_DATA['id']
+        db.session.commit()
+
+        self.project.sync_memberships_with_github()
+        db.session.commit()
+
+        for user, allows_management in [(aromanovich, True),
+                                        (vsokolov, True),
+                                        (ramm, False)]:
+            membership = Membership.query.filter_by(
+                project=self.project, user=user).first()
+            assert membership.allows_management == allows_management
+
+        assert not john_doe.memberships.first()  # Just in case :)
 
 
 class TestBuildDB(TestCase):

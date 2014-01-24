@@ -183,6 +183,28 @@ class User(HasRepositories, db.Model, UserMixin):
         """
         return list(self.gh.iter_repos(self.gh_login))
 
+    def sync_memberships_with_github(self):
+        """Does the same as :meth:`Project.sync_memberships_with_github`,
+        but for the user.
+        """
+        for membership in self.memberships:
+            db.session.delete(membership)
+
+        github_data = collections.defaultdict(lambda: False)
+        for gh_team in self.gh.iter_user_teams():
+            for gh_repo in gh_team.iter_repos():
+                github_data[gh_repo.id] |= gh_team.permission in ('admin', 'push')
+
+        for gh_repo_id, can_manage in github_data.iteritems():
+            project = Project.query.filter_by(gh_id=gh_repo_id).first()
+            if not project:
+                continue
+            membership = Membership(
+                project=project,
+                user=self,
+                allows_management=can_manage)
+            db.session.add(membership)
+
 
 class Organization(HasRepositories, db.Model):
     """Stores a set of organization repositories that a user has
@@ -222,6 +244,9 @@ class Membership(db.Model):
     project = db.relationship(
         'Project', backref=db.backref('memberships', lazy='dynamic'))
 
+    def __repr__(self):
+        return u'<Membership {0!r} {1!r}>'.format(self.user, self.project)
+
 
 class Project(db.Model):
     """Project is a GitHub repository that is being watched by
@@ -257,7 +282,7 @@ class Project(db.Model):
         'User', backref=db.backref('owned_projects', lazy='dynamic'))
 
     def __repr__(self):
-        return u'<Project #{0.id} {0.gh_full_name}>'.format(self)
+        return u'<Project #{0.id} "{0.gh_full_name}">'.format(self)
 
     @property
     def passphrase(self):
@@ -281,6 +306,31 @@ class Project(db.Model):
         if ref:
             builds = builds.filter_by(gh_commit_ref=ref)
         return builds.first()
+
+    def sync_memberships_with_github(self):
+        """Synchronizes project members with GitHub.
+
+        GitHub _repository members_ with admin and push rights become
+        :term:`project managers`, other _repository members_ become
+        :term:`project members`.
+        """
+        for membership in self.memberships:
+            db.session.delete(membership)
+
+        github_data = collections.defaultdict(lambda: False)
+        for gh_team in self.gh.iter_teams():
+            for gh_user in gh_team.iter_members():
+                github_data[gh_user.id] |= gh_team.permission in ('admin', 'push')
+
+        for gh_user_id, can_manage in github_data.iteritems():
+            user = User.query.filter_by(gh_id=gh_user_id).first()
+            if not user:
+                continue
+            membership = Membership(
+                project=self,
+                user=user,
+                allows_management=can_manage)
+            db.session.add(membership)
 
 
 class Hook(db.Model):
