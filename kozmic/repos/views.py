@@ -1,5 +1,6 @@
 import datetime
 import logging
+import collections
 
 import github3
 from Crypto.PublicKey import RSA
@@ -16,10 +17,33 @@ logger = logging.getLogger(__name__)
 
 @bp.route('/')
 def index():
-    existing_projects = dict(current_user.projects.with_entities(
-        Project.gh_id, Project.id).all())
+    user_repositories = current_user.repositories.with_entities(
+        db.literal(current_user.gh_login).label('gh_owner_login'),
+        User.Repository.gh_id.label('gh_id'),
+        User.Repository.gh_full_name.label('gh_full_name'))
+
+    user_org_repositories = current_user.organizations.join(
+        Organization.Repository
+    ).with_entities(
+        Organization.gh_login.label('gh_owner_login'),
+        Organization.Repository.gh_id.label('gh_id'),
+        Organization.Repository.gh_full_name.label('gh_full_name'),
+    )
+
+    repositories = user_repositories.union_all(user_org_repositories).subquery()
+
+    repositories_without_project = db.session.query(repositories).outerjoin(
+        Project, repositories.c.gh_id == Project.gh_id
+    ).filter(
+        Project.id == None
+    ).all()
+
+    repositories_by_owner = collections.defaultdict(list)
+    for gh_owner_login, gh_id, gh_full_name in repositories_without_project:
+        repositories_by_owner[gh_owner_login].append((gh_id, gh_full_name))
+
     return render_template(
-        'repos/index.html', existing_projects=existing_projects)
+        'repos/index.html', repositories_by_owner=repositories_by_owner)
 
 
 @bp.route('/sync/')
