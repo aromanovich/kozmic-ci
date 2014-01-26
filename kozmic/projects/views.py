@@ -39,6 +39,15 @@ def get_project(id, for_management=True):
     return project
 
 
+@bp.route('/<int:id>/delete/', methods=('POST',))
+def delete_project(id):
+    project = Project.query.get_or_404(id)
+    perms.delete_project(id).test(http_exception=403)
+    db.session.delete(project)
+    db.session.commit()
+    return redirect(url_for('.index'))
+
+
 @bp.route('/<int:id>/history/')
 def history(id):
     project = get_project(id, for_management=False)
@@ -130,6 +139,7 @@ def settings(id):
         project=project,
         members=members,
         is_current_user_a_manager=perms.manage_project(id).can(),
+        can_current_user_delete_a_project=perms.delete_project(id).can(),
         fqdn=current_app.config['SERVER_NAME'])
 
 

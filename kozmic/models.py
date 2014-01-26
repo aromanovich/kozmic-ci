@@ -220,7 +220,7 @@ class Membership(db.Model):
     user = db.relationship(
         'User', backref=db.backref('memberships', lazy='dynamic'))
     project = db.relationship(
-        'Project', backref=db.backref('memberships', lazy='dynamic'))
+        'Project', backref=db.backref('memberships', lazy='dynamic', cascade='all'))
 
 
 class Project(db.Model):
@@ -302,7 +302,8 @@ class Hook(db.Model):
     #: Specified docker image is pulled from index.docker.io before build
     docker_image = db.Column(db.String(200), nullable=False)
     #: Project
-    project = db.relationship(Project, backref=db.backref('hooks', lazy='dynamic'))
+    project = db.relationship(
+        Project, backref=db.backref('hooks', lazy='dynamic', cascade='all'))
 
 
 class TrackedFile(db.Model):
@@ -351,8 +352,8 @@ class Build(db.Model):
     #: 'enqueued', 'success', 'pending', 'failure', 'error'
     status = db.Column(db.String(40), nullable=False)
     #: Project
-    project = db.relationship(Project,
-                              backref=db.backref('builds', lazy='dynamic'))
+    project = db.relationship(
+        Project, backref=db.backref('builds', lazy='dynamic', cascade='all'))
 
     def calculate_number(self):
         """Computes and sets :attr:`number`."""
@@ -445,7 +446,8 @@ class HookCall(db.Model):
     #: Hook
     hook = db.relationship(Hook, backref=db.backref('calls', lazy='dynamic'))
     #: Build
-    build = db.relationship(Build, backref=db.backref('hook_calls', lazy='dynamic'))
+    build = db.relationship(
+        Build, backref=db.backref('hook_calls', lazy='dynamic', cascade='all'))
 
 
 class Job(db.Model):
@@ -469,7 +471,8 @@ class Job(db.Model):
     #: uuid of a Celery task that is running a job
     task_uuid = db.Column(db.String(36))
     #: :class:`Build`
-    build = db.relationship(Build, backref=db.backref('jobs', lazy='dynamic'))
+    build = db.relationship(
+        Build, backref=db.backref('jobs', lazy='dynamic', cascade='all'))
     #: :class:`HookCall`
     hook_call = db.relationship('HookCall')
 

@@ -15,6 +15,13 @@ project_manager = partial(Need, 'project_manager')
 project_member = partial(Need, 'project_member')
 
 
+def delete_project(id):
+    """Returns a :class:`Permission` to delete the project
+    identified by ``id``.
+    """
+    return Permission(project_owner(id))
+
+
 def manage_project(id):
     """Returns a :class:`Permission` to manage the project
     identified by ``id``.

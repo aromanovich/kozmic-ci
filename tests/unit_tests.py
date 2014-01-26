@@ -18,7 +18,8 @@ from flask.ext.webtest import SessionScope
 import kozmic.builds.tasks
 import kozmic.builds.views
 from kozmic import mail
-from kozmic.models import db, Membership, User, Project, Build, TrackedFile
+from kozmic.models import (db, Membership, User, Project, Hook, HookCall, Job,
+                           Build, TrackedFile)
 from . import TestCase, factories, func_fixtures, utils, unit_fixtures as fixtures
 
 
@@ -137,6 +138,34 @@ class TestUserDB(TestCase):
 
         identity = self.user_4.get_identity()
         assert not identity.provides
+
+
+class TestProjectDB(TestCase):
+    def setup_method(self, method):
+        TestCase.setup_method(self, method)
+
+        self.user = factories.UserFactory.create()
+        self.project = factories.ProjectFactory.create(owner=self.user)
+        self.hook = factories.HookFactory.create(
+            project=self.project)
+        self.tracked_files = factories.TrackedFileFactory.create_batch(
+            3, hook=self.hook)
+        self.build = factories.BuildFactory.create(project=self.project)
+        self.hook_call = factories.HookCallFactory.create(
+            hook=self.hook, build=self.build)
+        self.job = factories.JobFactory.create(
+            build=self.build, hook_call=self.hook_call)
+
+    def test_delete(self):
+        self.db.session.delete(self.project)
+        self.db.session.commit()
+
+        assert User.query.first()
+        assert not Project.query.first()
+        assert not Hook.query.first()
+        assert not TrackedFile.query.first()
+        assert not HookCall.query.first()
+        assert not Job.query.first()
 
 
 class TestBuildDB(TestCase):

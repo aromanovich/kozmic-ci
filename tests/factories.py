@@ -3,8 +3,8 @@ import datetime
 
 import factory.alchemy
 
-from kozmic.models import (db, User, Project, Membership, Hook, HookCall,
-                           Build, Job, Organization)
+from kozmic.models import (db, User, Project, Membership, Hook, TrackedFile,
+                           HookCall, Build, Job, Organization)
 
 
 class Factory(factory.alchemy.SQLAlchemyModelFactory):
@@ -24,15 +24,16 @@ def setup(session):
 
 def reset():
     factories = (
-        BuildFactory,
-        ProjectFactory,
         UserFactory,
+        ProjectFactory,
         MembershipFactory,
         UserRepositoryFactory,
         OrganizationFactory,
         OrganizationRepositoryFactory,
+        BuildFactory,
         JobFactory,
         HookFactory,
+        TrackedFileFactory,
         HookCallFactory,
     )
     for factory in factories:
@@ -136,6 +137,12 @@ class JobFactory(Factory):
     FACTORY_FOR = Job
 
     id = factory.Sequence(_identity)
+
+
+class TrackedFileFactory(Factory):
+    FACTORY_FOR = TrackedFile
+
+    path = factory.Sequence(u'path-{}.txt'.format)
 
 
 class HookFactory(Factory):
