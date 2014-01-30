@@ -21,7 +21,6 @@ import fcntl
 import select
 import Queue
 
-import tailf
 import docker
 import redis
 from flask import current_app
