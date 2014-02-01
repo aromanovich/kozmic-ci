@@ -391,7 +391,8 @@ class Build(db.Model):
                 target_url=target_url or self.url,
                 description=description)
 
-        if self.status in ('failure', 'error'):
+        if (flask.current_app.config['KOZMIC_ENABLE_EMAIL_NOTIFICATIONS'] and
+                self.status in ('failure', 'error')):
             header_template = u'[{status}] {project}#{build_number} ({ref} — {sha})'
             html_template = '<p><a href="{url}">{description}</a></p>'
 

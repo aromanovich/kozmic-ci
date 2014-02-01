@@ -17,6 +17,7 @@ class DefaultConfig(object):
     KOZMIC_REDIS_PORT = 6379
     KOZMIC_REDIS_DATABASE = 0
     KOZMIC_STALL_TIMEOUT = 600
+    KOZMIC_ENABLE_EMAIL_NOTIFICATIONS = True
 
     DOCKER_URL = 'unix://var/run/docker.sock'
     DOCKER_API_VERSION = '1.8'
@@ -32,7 +33,9 @@ class DefaultConfig(object):
     CELERY_DEFAULT_QUEUE = 'kozmic'
 
     TAILER_URL_TEMPLATE = None
-    MAIL_DEFAULT_SENDER = None  # _must_ be configured
+
+    MAIL_DEFAULT_SENDER = None  # must be configured if email
+                                # notifications are enabled
 
 
 class DevelopmentConfig(DefaultConfig):
