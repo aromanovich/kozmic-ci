@@ -19,6 +19,8 @@ class DefaultConfig(object):
     KOZMIC_STALL_TIMEOUT = 600
 
     DOCKER_URL = 'unix://var/run/docker.sock'
+    DOCKER_API_VERSION = '1.8'
+
     BROKER_URL = 'redis://{host}:{port}/{db}'.format(
         host=KOZMIC_REDIS_HOST,
         port=KOZMIC_REDIS_PORT,

@@ -29,7 +29,8 @@ celery = Celery()
 csrf = CsrfProtect()
 mail = Mail()
 docker = LocalProxy(
-    lambda: _docker.Client(base_url=flask.current_app.config['DOCKER_URL']))
+    lambda: _docker.Client(base_url=flask.current_app.config['DOCKER_URL'],
+                           version=flask.current_app.config['DOCKER_API_VERSION']))
 
 
 def create_app(config=None):
