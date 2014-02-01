@@ -395,7 +395,12 @@ def _run(redis_client, channel, stall_timeout,
                     # (it will be catched in the outer try-except)
                     raise builder.exc_info[1], None, builder.exc_info[2]
                 else:
-                    yield builder.return_code, stdout, builder.container
+                    try:
+                        yield builder.return_code, stdout, builder.container
+                    except:
+                        return
+                        # otherwise we get "generator didn't stop after
+                        # throw()" error if nested code raised exception
     except:
         stdout += ('\nSorry, something went wrong. We are notified of '
                    'the issue and will fix it soon.')
