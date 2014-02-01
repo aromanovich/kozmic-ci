@@ -17,7 +17,7 @@ from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
 import kozmic.builds.views
-from kozmic import mail
+from kozmic import mail, docker
 from kozmic.models import db, Membership, User, Project, Build, TrackedFile
 from . import TestCase, factories, func_fixtures, utils, unit_fixtures as fixtures
 
@@ -357,6 +357,7 @@ class TestBuilder(TestCase):
 
             message_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
+                docker=docker._get_current_object(),
                 rsa_private_key=private_key,
                 passphrase=passphrase,
                 docker_image='kozmic/ubuntu-base:12.04',
@@ -388,6 +389,7 @@ class TestBuilder(TestCase):
 
             message_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
+                docker=docker._get_current_object(),
                 rsa_private_key=utils.generate_private_key('passphrase'),
                 passphrase='wrong-passphrase',
                 docker_image='kozmic/ubuntu-base:12.04',

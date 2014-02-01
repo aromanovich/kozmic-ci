@@ -18,6 +18,7 @@ class DefaultConfig(object):
     KOZMIC_REDIS_DATABASE = 0
     KOZMIC_STALL_TIMEOUT = 600
 
+    DOCKER_URL = 'unix://var/run/docker.sock'
     BROKER_URL = 'redis://{host}:{port}/{db}'.format(
         host=KOZMIC_REDIS_HOST,
         port=KOZMIC_REDIS_PORT,
@@ -27,6 +28,7 @@ class DefaultConfig(object):
     CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
     CELERY_IGNORE_RESULT = True
     CELERY_DEFAULT_QUEUE = 'kozmic'
+
     TAILER_URL_TEMPLATE = None
     MAIL_DEFAULT_SENDER = None  # _must_ be configured
 
