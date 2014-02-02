@@ -36,7 +36,7 @@ from werkzeug.utils import import_string
 if 'KOZMIC_CONFIG' in os.environ:
     config = import_string(os.environ['KOZMIC_CONFIG'])
     redis_host = config.KOZMIC_REDIS_HOST
-    redis_port = config.KOZMIC_REDIS_POST
+    redis_port = config.KOZMIC_REDIS_PORT
     redis_db = config.KOZMIC_REDIS_DATABASE
 else:
     redis_host = os.environ['REDIS_HOST']
@@ -54,20 +54,20 @@ def send_message(type, content):
 
 
 def app(environ, start_response):
-    match = re.match('/(?P<task_uuid>.+)/', environ['PATH_INFO'])
+    match = re.match('/(?P<job_id>.+)/', environ['PATH_INFO'])
     if not match:
         start_response('404', [('Content-Type', 'text/plain')])
-    task_uuid = match.group('task_uuid')
+    job_id = match.group('job_id')
 
     uwsgi.websocket_handshake(environ['HTTP_SEC_WEBSOCKET_KEY'],
                               environ.get('HTTP_ORIGIN', ''))
     
     # Emit the backlog of messages
-    lines = r.lrange(task_uuid, 0, -1)
+    lines = r.lrange(job_id, 0, -1)
     send_message('message', ''.join(lines))
 
     channel = redis.pubsub()
-    channel.subscribe(task_uuid)
+    channel.subscribe(job_id)
     channel_socket_fd = channel.connection._sock.fileno()
     websocket_fd = uwsgi.connection_fd()
 
@@ -94,7 +94,7 @@ def app(environ, start_response):
             except IOError:
                 break
             # Check if the job is still ongoing
-            if not redis.exists(task_uuid):
+            if not redis.exists(job_id):
                 send_message('status', 'finished')
                 break
     return ''

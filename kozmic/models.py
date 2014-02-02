@@ -551,9 +551,9 @@ class Job(db.Model):
 
     @property
     def tailer_url(self):
-        """URL of a websocket to use for the showing a job log in realtime."""
+        """URL of a websocket that streams a job log in realtime."""
         return flask.current_app.config['TAILER_URL_TEMPLATE'].format(
-            task_uuid=self.task_uuid)
+            job_id=self.task_uuid)
 
     def is_finished(self):
         """Is the job finished?"""

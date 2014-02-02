@@ -6,7 +6,7 @@ class Config(DevelopmentConfig):
     KOZMIC_GITHUB_CLIENT_ID = '...'
     KOZMIC_GITHUB_CLIENT_SECRET = '...'
     SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://user:@192.168.33.10/kozmic'
-    TAILER_URL_TEMPLATE = 'ws://192.168.33.210:8080/{task_uuid}/'
+    TAILER_URL_TEMPLATE = 'ws://192.168.33.210:8080/{job_id}/'
     KOZMIC_REDIS_HOST = '192.168.33.20'
     KOZMIC_REDIS_PORT = 6379
     KOZMIC_REDIS_DATABASE = 0

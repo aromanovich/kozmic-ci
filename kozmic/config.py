@@ -56,3 +56,4 @@ class TestingConfig(DefaultConfig):
     MAIL_SUPPRESS_SEND = True
     MAIL_DEFAULT_SENDER = 'Kozmic CI <no-reply@kozmic.test>'
     CELERY_ALWAYS_EAGER = True
+    TAILER_URL_TEMPLATE = 'ws://127.0.0.1:8801/{job_id}/'

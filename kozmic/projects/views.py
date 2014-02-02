@@ -93,7 +93,6 @@ def job(project_id, build_id, id):
     return render_template(
         'projects/job.html',
         project=project,
-        tailer_url_template=current_app.config['TAILER_URL_TEMPLATE'],
         build=build,
         job=job)
 
