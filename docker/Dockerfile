@@ -19,6 +19,6 @@ ADD ./files/supervisor.conf /etc/supervisor.conf
 ADD ./files/kozmic-uwsgi.ini /etc/kozmic-uwsgi.ini
 ADD ./files/tailer-uwsgi.ini /etc/tailer-uwsgi.ini
 ADD ./files/wrapped-docker /bin/wrapped-docker
-RUN chmod +x /bin/wrapped-docker /bin/docker
-ADD ./kozmic.sh /kozmic.sh
+ADD ./files/run.sh /run.sh
+RUN chmod +x /bin/wrapped-docker /bin/docker /run.sh
 VOLUME /var/lib/docker

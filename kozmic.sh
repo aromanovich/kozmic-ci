@@ -4,7 +4,6 @@
 # Create test database
 mysql -uroot -e'CREATE DATABASE kozmic_test CHARACTER SET utf8 COLLATE utf8_general_ci;'
 
-
 # Install requirements
 pip install -r ./requirements/basic.txt
 pip install -r ./requirements/dev.txt
