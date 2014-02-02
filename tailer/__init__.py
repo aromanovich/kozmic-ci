@@ -63,7 +63,7 @@ def app(environ, start_response):
                               environ.get('HTTP_ORIGIN', ''))
     
     # Emit the backlog of messages
-    lines = r.lrange(job_id, 0, -1)
+    lines = redis.lrange(job_id, 0, -1)
     send_message('message', ''.join(lines))
 
     channel = redis.pubsub()
