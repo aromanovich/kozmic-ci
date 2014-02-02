@@ -25,6 +25,5 @@ furl==0.3.5
 git+https://github.com/sigmavirus24/github3.py.git
 certifi==0.0.8
 ipython==1.1.0  # to have nice ./manage.py shell
-docker-py==0.2.2
-requests==1.2.0  # due to https://github.com/dotcloud/docker-py/issues/47
+git+https://github.com/dotcloud/docker-py.git@548b1e7f6cc60e8ece03f972ce21e83ad3a71906
 raven==4.0.2
