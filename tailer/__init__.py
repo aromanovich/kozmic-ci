@@ -6,19 +6,19 @@ content to a websocket.
 
 The application exposes only one endpoint: `/<channel-name>/`.
 
-Once there is a connection, it does the following:
+It does the following:
 
 1. Retrieves a list of strings stored at the `channel-name` *key* and sends
    it to the websocket;
-2. Subscribes to the `channel-name` pub/sub *channel* and sends it's content
+2. Subscribes to the `channel-name` pub/sub *channel* and streams it's content
    to the websocket while the `channel-name` *key* exists in Redis database.
 
-The implementation heavily rely on uwsgi functionality. The app can be started
+The implementation heavily rely on the uwsgi functionality. The app can be started
 using the following command string::
 
-    TAILER_REDIS_HOST=127.0.0.1 \\
-    TAILER_REDIS_PORT=6379 \\
-    TAILER_REDIS_DATABASE=0 \\
+    REDIS_HOST=127.0.0.1 \\
+    REDIS_PORT=6379 \\
+    REDIS_DATABASE=0 \\
     uwsgi --http-socket :9090 --gevent 100 --module tailer:app --gevent-monkey-patch
 
 Do not use ``--http :9090``, because it breaks websockets ping/pong.
@@ -30,6 +30,20 @@ import json
 import uwsgi
 import redis
 import gevent.select
+from werkzeug.utils import import_string
+
+
+if 'KOZMIC_CONFIG' in os.environ:
+    config = import_string(os.environ['KOZMIC_CONFIG'])
+    redis_host = config.KOZMIC_REDIS_HOST
+    redis_port = config.KOZMIC_REDIS_POST
+    redis_db = config.KOZMIC_REDIS_DATABASE
+else:
+    redis_host = os.environ['REDIS_HOST']
+    redis_port = os.environ['REDIS_PORT']
+    redis_db = os.environ['REDIS_DATABASE']
+
+redis = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 
 
 def send_message(type, content):
@@ -45,11 +59,6 @@ def app(environ, start_response):
         start_response('404', [('Content-Type', 'text/plain')])
     task_uuid = match.group('task_uuid')
 
-    r = redis.StrictRedis(
-        host=os.environ['TAILER_REDIS_HOST'],
-        port=os.environ['TAILER_REDIS_PORT'],
-        db=os.environ['TAILER_REDIS_DATABASE'])
-
     uwsgi.websocket_handshake(environ['HTTP_SEC_WEBSOCKET_KEY'],
                               environ.get('HTTP_ORIGIN', ''))
     
@@ -57,7 +66,7 @@ def app(environ, start_response):
     lines = r.lrange(task_uuid, 0, -1)
     send_message('message', ''.join(lines))
 
-    channel = r.pubsub()
+    channel = redis.pubsub()
     channel.subscribe(task_uuid)
     channel_socket_fd = channel.connection._sock.fileno()
     websocket_fd = uwsgi.connection_fd()
@@ -76,7 +85,7 @@ def app(environ, start_response):
                     # Let uwsgi do it's job to receive pong and send ping
                     uwsgi.websocket_recv_nb()
         else:
-            # Have not heard from channel and client in 5 seconds...
+            # Have not heard from the channel and the client in 5 seconds...
             try:
                 # Check if the client is still here by sending ping
                 # (`websocket_recv` sends ping implicitly,
@@ -84,8 +93,8 @@ def app(environ, start_response):
                 uwsgi.websocket_recv_nb()
             except IOError:
                 break
-            # Check if the build is still ongoing
-            if not r.exists(task_uuid):
+            # Check if the job is still ongoing
+            if not redis.exists(task_uuid):
                 send_message('status', 'finished')
                 break
     return ''
