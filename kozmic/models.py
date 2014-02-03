@@ -520,7 +520,7 @@ class Job(db.Model):
         """
         self.started_at = datetime.datetime.utcnow()
         self.finished_at = None
-        description = 'Kozmic build #{0} is pending.'.format(self.build.number)
+        description = 'Kozmic build #{0} is pending'.format(self.build.number)
         self.build.set_status('pending', description=description)
 
     def finished(self, return_code):
@@ -533,7 +533,7 @@ class Job(db.Model):
         if return_code != 0:
             description = (
                 'Kozmic build #{0} has failed '
-                'because of the "{1}" job.'.format(
+                'because of the "{1}" job'.format(
                     self.build.number,
                     self.hook_call.hook.title))
             self.build.set_status('failure', description=description)
@@ -545,7 +545,7 @@ class Job(db.Model):
         all_other_jobs_succeeded = all(job.return_code == 0 for job in jobs
                                        if job.id != self.id)
         if all_other_jobs_finished and all_other_jobs_succeeded:
-            description = 'Kozmic build #{0} has passed.'.format(self.build.number)
+            description = 'Kozmic build #{0} has passed'.format(self.build.number)
             self.build.set_status('success', description=description)
             return
 
