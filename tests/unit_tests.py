@@ -456,10 +456,10 @@ class TestBuildTaskDB(TestCase):
         set_status_mock.assert_has_calls([
             mock.call(
                 'pending',
-                description='Kozmic build #{} is pending.'.format(build_id)),
+                description='Kozmic build #{} is pending'.format(build_id)),
             mock.call(
                 'success',
-                description='Kozmic build #{} has passed.'.format(build_id)),
+                description='Kozmic build #{} has passed'.format(build_id)),
         ])
 
     @pytest.mark.docker
