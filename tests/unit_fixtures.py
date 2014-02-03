@@ -98,6 +98,26 @@ TEAM_35885_DATA = {
   u'url': u'https://api.github.com/teams/35885'
 }
 
+USER_NEITHERE_DATA = {
+ u'avatar_url': u'https://gravatar.com/avatar/3faf07a62e3432883250147551af5bbc?d=https%3A%2F%2Fidenticons.github.com%2Fef7376488f5cf2a998740274c1ea1f29.png&r=x',
+ u'events_url': u'https://api.github.com/users/neithere/events{/privacy}',
+ u'followers_url': u'https://api.github.com/users/neithere/followers',
+ u'following_url': u'https://api.github.com/users/neithere/following{/other_user}',
+ u'gists_url': u'https://api.github.com/users/neithere/gists{/gist_id}',
+ u'gravatar_id': u'3faf07a62e3432883250147551af5bbc',
+ u'html_url': u'https://github.com/neithere',
+ u'id': 27304,
+ u'login': u'neithere',
+ u'organizations_url': u'https://api.github.com/users/neithere/orgs',
+ u'received_events_url': u'https://api.github.com/users/neithere/received_events',
+ u'repos_url': u'https://api.github.com/users/neithere/repos',
+ u'site_admin': False,
+ u'starred_url': u'https://api.github.com/users/neithere/starred{/owner}{/repo}',
+ u'subscriptions_url': u'https://api.github.com/users/neithere/subscriptions',
+ u'type': u'User',
+ u'url': u'https://api.github.com/users/neithere'
+}
+
 USER_AROMANOVICH_DATA = {
   u'avatar_url': u'https://gravatar.com/avatar/e85b7ebc8dacdaa850d3999f7c676343?d=https%3A%2F%2Fidenticons.github.com%2F117220178921ce5a8073addc64382fd3.png&r=x',
   u'events_url': u'https://api.github.com/users/aromanovich/events{/privacy}',
@@ -1165,3 +1185,42 @@ USER_REPOS_DATA = [{
   u'watchers_count': 0}
 ]
 USER_REPOS_JSON = json.dumps(USER_REPOS_DATA)
+
+
+MEDIASITE_ORG_DATA = {
+ u'avatar_url': u'https://gravatar.com/avatar/d404162db522ec8439e7aba6e9bf2e21?d=https%3A%2F%2Fidenticons.github.com%2F26b26f838dcc454726e1d4f022aaee8d.png&r=x',
+ u'billing_email': u'xxx@xxx.xxx',
+ u'blog': u'http://www.66.ru',
+ u'collaborators': 0,
+ u'company': None,
+ u'created_at': u'2011-02-01T16:17:30Z',
+ u'disk_usage': 902288,
+ u'email': None,
+ u'events_url': u'https://api.github.com/orgs/mediasite/events',
+ u'followers': 0,
+ u'following': 0,
+ u'html_url': u'https://github.com/mediasite',
+ u'id': 595083,
+ u'location': u'Yekaterinburg, Russia',
+ u'login': u'mediasite',
+ u'members_url': u'https://api.github.com/orgs/mediasite/members{/member}',
+ u'name': u'Mediasite',
+ u'owned_private_repos': 29,
+ u'plan': {u'name': u'gold', u'private_repos': 50, u'space': 20971520},
+ u'private_gists': 0,
+ u'public_gists': 0,
+ u'public_members_url': u'https://api.github.com/orgs/mediasite/public_members{/member}',
+ u'public_repos': 30,
+ u'repos_url': u'https://api.github.com/orgs/mediasite/repos',
+ u'total_private_repos': 29,
+ u'type': u'Organization',
+ u'updated_at': u'2014-02-03T18:28:03Z',
+ u'url': u'https://api.github.com/orgs/mediasite'}
+
+MEDIASITE_OWNERS_TEAM_DATA = {u'id': 35618,
+ u'members_url': u'https://api.github.com/teams/35618/members{/member}',
+ u'name': u'Owners',
+ u'permission': u'admin',
+ u'repositories_url': u'https://api.github.com/teams/35618/repos',
+ u'slug': u'owners',
+ u'url': u'https://api.github.com/teams/35618'} 

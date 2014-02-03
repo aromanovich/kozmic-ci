@@ -201,17 +201,25 @@ class TestProjectDB(TestCase):
     def setup_method(self, method):
         TestCase.setup_method(self, method)
 
-        self.owner = factories.UserFactory.create()
-
         self.repo_data = fixtures.TEAM_35885_REPOS_DATA[0]
+        self.user = factories.UserFactory.create()
         self.project = factories.ProjectFactory.create(
-            owner=self.owner,
+            owner=self.user,
             gh_full_name=self.repo_data['full_name'],
             gh_login=self.repo_data['owner']['login'],
             gh_name=self.repo_data['name'])
+        self.hook = factories.HookFactory.create(
+            project=self.project)
+        self.tracked_files = factories.TrackedFileFactory.create_batch(
+            3, hook=self.hook)
+        self.build = factories.BuildFactory.create(project=self.project)
+        self.hook_call = factories.HookCallFactory.create(
+            hook=self.hook, build=self.build)
+        self.job = factories.JobFactory.create(
+            build=self.build, hook_call=self.hook_call)
 
     @httpretty.httprettified
-    def test_sync_memberships_with_github_(self):
+    def test_sync_memberships_with_github(self):
         httpretty.register_uri(
             httpretty.GET,
             'https://api.github.com/repos/{}'.format(self.project.gh_full_name),
@@ -235,43 +243,51 @@ class TestProjectDB(TestCase):
             'https://api.github.com/teams/267031/members',
             json.dumps([
                 fixtures.USER_AROMANOVICH_DATA,
+                fixtures.USER_NEITHERE_DATA,
+            ]))
+
+        httpretty.register_uri(
+            httpretty.GET,
+            'https://api.github.com/orgs/mediasite',
+            json.dumps(fixtures.MEDIASITE_ORG_DATA))
+        httpretty.register_uri(
+            httpretty.GET,
+            'https://api.github.com/orgs/mediasite/teams',
+            json.dumps([
+                fixtures.TEAM_35885_DATA,
+                fixtures.MEDIASITE_OWNERS_TEAM_DATA,
+            ]))
+        httpretty.register_uri(
+            httpretty.GET,
+            'https://api.github.com/teams/35618/members',  # mediasite owners
+            json.dumps([
                 fixtures.USER_RAMM_DATA,
             ]))
 
-        aromanovich, ramm, vsokolov, john_doe = factories.UserFactory.create_batch(4)
+        aromanovich, ramm, vsokolov, neithere, john_doe = \
+            factories.UserFactory.create_batch(5)
         aromanovich.gh_id = fixtures.USER_AROMANOVICH_DATA['id']
         ramm.gh_id = fixtures.USER_RAMM_DATA['id']
         vsokolov.gh_id = fixtures.USER_VSOKOLOV_DATA['id']
+        neithere.gh_id = fixtures.USER_NEITHERE_DATA['id']
         db.session.commit()
 
         self.project.sync_memberships_with_github()
         db.session.commit()
 
+        # Note: ramm is not listed in any of the repository teams,
+        # but he is a member of the Owners team and hence
+        # have access to the all organization repositories.
         for user, allows_management in [(aromanovich, True),
                                         (vsokolov, True),
-                                        (ramm, False)]:
+                                        (neithere, False),
+                                        (ramm, True)]:
             membership = Membership.query.filter_by(
                 project=self.project, user=user).first()
             assert membership.allows_management == allows_management
 
         assert not john_doe.memberships.first()  # Just in case :)
 
-
-class TestProjectDB(TestCase):
-    def setup_method(self, method):
-        TestCase.setup_method(self, method)
-
-        self.user = factories.UserFactory.create()
-        self.project = factories.ProjectFactory.create(owner=self.user)
-        self.hook = factories.HookFactory.create(
-            project=self.project)
-        self.tracked_files = factories.TrackedFileFactory.create_batch(
-            3, hook=self.hook)
-        self.build = factories.BuildFactory.create(project=self.project)
-        self.hook_call = factories.HookCallFactory.create(
-            hook=self.hook, build=self.build)
-        self.job = factories.JobFactory.create(
-            build=self.build, hook_call=self.hook_call)
 
     @mock.patch.object(Project, 'gh')
     def test_delete_deploy_key(self, gh_mock):

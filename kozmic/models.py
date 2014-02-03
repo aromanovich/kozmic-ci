@@ -3,6 +3,7 @@
 kozmic.models
 ~~~~~~~~~~~~~
 """
+import itertools
 import datetime
 import collections
 import hashlib
@@ -353,8 +354,22 @@ class Project(db.Model):
         for membership in self.memberships:
             db.session.delete(membership)
 
+        extra_teams = []
+        gh_owner = self.gh.owner
+        if gh_owner.type == 'Organization':
+            # The Owners team is not listed in /repos/:org/:repo/teams and
+            # it is "expected behaviour currently", but it's members
+            # definitely have admin access to the repository.
+            # The workaround is to find the Owners team "manually" by
+            # iterating through all the organization teams.
+            for gh_team in self.owner.gh.organization(gh_owner.login).iter_teams():
+                # Note: owners team can not be renamed, so it's completely
+                # OK to search for it by name
+                if gh_team.name == 'Owners':
+                    extra_teams.append(gh_team)
+
         github_data = collections.defaultdict(lambda: False)
-        for gh_team in self.gh.iter_teams():
+        for gh_team in itertools.chain(extra_teams, self.gh.iter_teams()):
             for gh_user in gh_team.iter_members():
                 github_data[gh_user.id] |= gh_team.permission in ('admin', 'push')
 

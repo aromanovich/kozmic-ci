@@ -21,8 +21,7 @@ alembic==0.6.2
 ansi2html==1.0.5
 pycrypto==2.6.1
 furl==0.3.5
-# Replace with github3.py==0.8.0 as it gets released:
-git+https://github.com/sigmavirus24/github3.py.git
+github3.py==0.8.1
 certifi==0.0.8
 ipython==1.1.0  # to have nice ./manage.py shell
 git+https://github.com/dotcloud/docker-py.git@548b1e7f6cc60e8ece03f972ce21e83ad3a71906
