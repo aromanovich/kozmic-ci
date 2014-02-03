@@ -99,4 +99,28 @@
       Add a new member
     </a>
   {% endif %}
+
+  {% if can_current_user_delete_a_project -%}
+    <hr>
+
+    <script>
+      var deleteProjectURL = '{{ url_for('.delete_project', id=project.id) }}';
+      $(function() {
+        $('#delete-project').attr('action', deleteProjectURL);
+        $('#delete-project').submit(function() {
+          var text = prompt('This will irrevocably destroy all project data. ' +
+                            'If you do want to continue, please type a full GitHub name ' +
+                            'of the project.');
+          return (text === '{{ project.gh_full_name }}');
+        });
+      });
+    </script>
+
+    <form id="delete-project" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-danger">
+        <span class="glyphicon glyphicon-remove-sign"></span> Delete project
+      </button>
+    </form>
+  {% endif %}
 {% endblock %}

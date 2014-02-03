@@ -183,6 +183,37 @@ class TestProjects(TestCase):
         assert project.rsa_public_key.startswith('ssh-rsa ')
         assert project.rsa_private_key.startswith('-----BEGIN RSA PRIVATE KEY-----')
 
+    def test_project_deletion(self):
+        """User can delete an owned project."""
+        project = factories.ProjectFactory.create(owner=self.user_1)
+        project_id = project.id
+        factories.MembershipFactory.create(user=self.user_2, project=project)
+
+        def get_settings_page(project):
+            return self.w.get('/').maybe_follow().click(
+                project.gh_full_name).maybe_follow().click('Settings')
+
+        self.login(user_id=self.user_2.id)
+        r = get_settings_page(project)
+        assert 'delete-project' not in r.forms
+        with mock.patch('flask.ext.wtf.csrf.validate_csrf', return_value=True):
+            r = self.w.post(
+                url_for('projects.delete_project', id=project.id), status='*')
+            assert r.status_code == 403
+
+        self.login(user_id=self.user_1.id)
+        r = get_settings_page(project)
+        form = r.forms['delete-project']
+        # Imitate JS logic:
+        form.action = url_for(
+            'projects.delete_project', id=project.id, _external=False)
+        assert form.action in r
+
+        with mock.patch.object(Project, 'gh'):
+            form.submit().follow()
+
+        assert not Project.query.get(project_id)
+
 
 class TestHooksManagement(TestCase):
     def setup_method(self, method):

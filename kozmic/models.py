@@ -7,6 +7,7 @@ import datetime
 import collections
 import hashlib
 import os.path
+import logging
 
 import github3
 import sqlalchemy.dialects.mysql
@@ -19,6 +20,9 @@ from sqlalchemy.ext.declarative import declared_attr
 
 from . import db, mail, perms
 from .utils import JSONEncodedDict
+
+
+logger = logging.getLogger(__name__)
 
 
 class RepositoryBase(object):
@@ -220,7 +224,7 @@ class Membership(db.Model):
     user = db.relationship(
         'User', backref=db.backref('memberships', lazy='dynamic'))
     project = db.relationship(
-        'Project', backref=db.backref('memberships', lazy='dynamic'))
+        'Project', backref=db.backref('memberships', lazy='dynamic', cascade='all'))
 
 
 class Project(db.Model):
@@ -273,6 +277,38 @@ class Project(db.Model):
         """
         return self.owner.gh.repository(self.gh_login, self.gh_name)
 
+    def delete_deploy_key(self):
+        gh_key = self.gh.key(self.gh_key_id)
+        if not gh_key:
+            return True
+
+        try:
+            gh_key.delete()
+        except github3.GitHubError as exc:
+            logger.warning(
+                'GitHub API call to delete {project}\'s key has failed. '
+                'The exception is "{exc!r} and it\'s errors are '
+                '{errors!r}.".'.format(project=self, exc=exc,
+                                       errors=exc.errors))
+            return False
+        else:
+            return True
+
+    def delete(self):
+        """Deletes the project and it's corresponding GitHub entities such as
+        hooks, deploy key, etc. Returns True if they all have been
+        successfully deleted (or were missing); False otherwise.
+        """
+        db.session.delete(self)
+
+        rv = True
+        rv &= self.delete_deploy_key()
+        for hook in self.hooks:
+            rv &= hook.delete()
+            if not rv:
+                break
+        return rv
+
     def get_latest_build(self, ref=None):
         """
         :rtype: :class:`Build`
@@ -302,7 +338,30 @@ class Hook(db.Model):
     #: Specified docker image is pulled from index.docker.io before build
     docker_image = db.Column(db.String(200), nullable=False)
     #: Project
-    project = db.relationship(Project, backref=db.backref('hooks', lazy='dynamic'))
+    project = db.relationship(
+        Project, backref=db.backref('hooks', lazy='dynamic', cascade='all'))
+
+    def delete(self):
+        """Deletes the project hook. Returns True if it's corresponding GitHub
+        hook is missing or has been successfully deleted; False otherwise.
+        """
+        db.session.delete(self)
+
+        gh_hook = self.project.gh.hook(self.gh_id)
+        if not gh_hook:
+            # Probably it was deleted manually using GitHub interface, it's OK
+            return True
+
+        try:
+            gh_hook.delete()
+        except github3.GitHubError as exc:
+            logger.warning(
+                'GitHub API call to delete {hook!r} has failed. '
+                'The exception is "{exc!r} and it\'s errors are '
+                '{errors!r}.".'.format(hook=self, exc=exc, errors=exc.errors))
+            return False
+        else:
+            return True
 
 
 class TrackedFile(db.Model):
@@ -351,8 +410,8 @@ class Build(db.Model):
     #: 'enqueued', 'success', 'pending', 'failure', 'error'
     status = db.Column(db.String(40), nullable=False)
     #: Project
-    project = db.relationship(Project,
-                              backref=db.backref('builds', lazy='dynamic'))
+    project = db.relationship(
+        Project, backref=db.backref('builds', lazy='dynamic', cascade='all'))
 
     def calculate_number(self):
         """Computes and sets :attr:`number`."""
@@ -446,7 +505,8 @@ class HookCall(db.Model):
     #: Hook
     hook = db.relationship(Hook, backref=db.backref('calls', lazy='dynamic'))
     #: Build
-    build = db.relationship(Build, backref=db.backref('hook_calls', lazy='dynamic'))
+    build = db.relationship(
+        Build, backref=db.backref('hook_calls', lazy='dynamic', cascade='all'))
 
 
 class Job(db.Model):
@@ -470,7 +530,8 @@ class Job(db.Model):
     #: uuid of a Celery task that is running a job
     task_uuid = db.Column(db.String(36))
     #: :class:`Build`
-    build = db.relationship(Build, backref=db.backref('jobs', lazy='dynamic'))
+    build = db.relationship(
+        Build, backref=db.backref('jobs', lazy='dynamic', cascade='all'))
     #: :class:`HookCall`
     hook_call = db.relationship('HookCall')
 
