@@ -277,17 +277,36 @@ class Project(db.Model):
         """
         return self.owner.gh.repository(self.gh_login, self.gh_name)
 
+    def delete_deploy_key(self):
+        gh_key = self.gh.key(self.gh_key_id)
+        if not gh_key:
+            return True
+
+        try:
+            gh_key.delete()
+        except github3.GitHubError as exc:
+            logger.warning(
+                'GitHub API call to delete {project}\'s key has failed. '
+                'The exception is "{exc!r} and it\'s errors are '
+                '{errors!r}.".'.format(project=self, exc=exc,
+                                       errors=exc.errors))
+            return False
+        else:
+            return True
+
     def delete(self):
         """Deletes the project and it's corresponding GitHub entities such as
         hooks, deploy key, etc. Returns True if they all have been
-        successfully deleted (or were missing) and False otherwise.
+        successfully deleted (or were missing); False otherwise.
         """
         db.session.delete(self)
 
         rv = True
+        rv &= self.delete_deploy_key()
         for hook in self.hooks:
             rv &= hook.delete()
-
+            if not rv:
+                break
         return rv
 
     def get_latest_build(self, ref=None):
@@ -338,7 +357,7 @@ class Hook(db.Model):
         except github3.GitHubError as exc:
             logger.warning(
                 'GitHub API call to delete {hook!r} has failed. '
-                'The exception was "{exc!r} and it\'s errors was '
+                'The exception is "{exc!r} and it\'s errors are '
                 '{errors!r}.".'.format(hook=self, exc=exc, errors=exc.errors))
             return False
         else:
