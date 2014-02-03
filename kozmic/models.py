@@ -7,6 +7,7 @@ import datetime
 import collections
 import hashlib
 import os.path
+import logging
 
 import github3
 import sqlalchemy.dialects.mysql
@@ -19,6 +20,9 @@ from sqlalchemy.ext.declarative import declared_attr
 
 from . import db, mail, perms
 from .utils import JSONEncodedDict
+
+
+logger = logging.getLogger(__name__)
 
 
 class RepositoryBase(object):
@@ -273,6 +277,19 @@ class Project(db.Model):
         """
         return self.owner.gh.repository(self.gh_login, self.gh_name)
 
+    def delete(self):
+        """Deletes the project and it's corresponding GitHub entities such as
+        hooks, deploy key, etc. Returns True if they all have been
+        successfully deleted (or were missing) and False otherwise.
+        """
+        db.session.delete(self)
+
+        rv = True
+        for hook in self.hooks:
+            rv &= hook.delete()
+
+        return rv
+
     def get_latest_build(self, ref=None):
         """
         :rtype: :class:`Build`
@@ -304,6 +321,28 @@ class Hook(db.Model):
     #: Project
     project = db.relationship(
         Project, backref=db.backref('hooks', lazy='dynamic', cascade='all'))
+
+    def delete(self):
+        """Deletes the project hook. Returns True if it's corresponding GitHub
+        hook is missing or has been successfully deleted; False otherwise.
+        """
+        db.session.delete(self)
+
+        gh_hook = self.project.gh.hook(self.gh_id)
+        if not gh_hook:
+            # Probably it was deleted manually using GitHub interface, it's OK
+            return True
+
+        try:
+            gh_hook.delete()
+        except github3.GitHubError as exc:
+            logger.warning(
+                'GitHub API call to delete {hook!r} has failed. '
+                'The exception was "{exc!r} and it\'s errors was '
+                '{errors!r}.".'.format(hook=self, exc=exc, errors=exc.errors))
+            return False
+        else:
+            return True
 
 
 class TrackedFile(db.Model):

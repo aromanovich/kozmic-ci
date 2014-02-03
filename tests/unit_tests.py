@@ -157,7 +157,9 @@ class TestProjectDB(TestCase):
             build=self.build, hook_call=self.hook_call)
 
     def test_delete(self):
-        self.db.session.delete(self.project)
+        with mock.patch.object(Hook, 'delete') as hook_delete_mock:
+            self.project.delete()
+            hook_delete_mock.assert_called_once_with()
         self.db.session.commit()
 
         assert User.query.first()

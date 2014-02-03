@@ -43,9 +43,20 @@ def get_project(id, for_management=True):
 def delete_project(id):
     project = Project.query.get_or_404(id)
     perms.delete_project(id).test(http_exception=403)
-    db.session.delete(project)
-    db.session.commit()
-    return redirect(url_for('.index'))
+
+    ok_to_commit = project.delete()
+    if ok_to_commit:
+        db.session.commit()
+        flash('Project "{}" has been successfully '
+              'deleted.'.format(project.gh_full_name),
+              'success')
+        return redirect(url_for('.index'))
+    else:
+        db.session.rollback()
+        flash('Something went wrong (probably there was a problem '
+              'communicating with the GitHub API). Please try again later.',
+              'warning')
+        return redirect(url_for('.settings', id=project.id))
 
 
 @bp.route('/<int:id>/history/')
@@ -207,26 +218,14 @@ def delete_hook(project_id, hook_id):
     project = get_project(project_id, for_management=True)
     hook = project.hooks.filter_by(id=hook_id).first_or_404()
 
-    db.session.delete(hook)
-
-    gh_hook = project.gh.hook(hook.gh_id)
-    if gh_hook:
-        try:
-            gh_hook.delete()
-        except github3.GitHubError as exc:
-            logger.warning(
-                'GitHub API call to delete {hook!r} has failed. '
-                'The current user is {user!r}. The exception was '
-                '"{exc!r} and it\'s errors was {errors!r}.".'.format(
-                    hook=hook,
-                    user=current_user,
-                    exc=exc,
-                    errors=exc.errors))
-            db.session.rollback()
+    ok_to_commit = hook.delete()
+    if ok_to_commit:
+        db.session.commit()
     else:
-        logger.warning(
-            'GitHub hook for {hook!r} was not found.'.format(hook=hook))
-    db.session.commit()
+        db.session.rollback()
+        flash('Something went wrong (probably there was a problem '
+              'communicating with the GitHub API). Please try again later.',
+              'warning')
     return redirect(url_for('.settings', id=project_id))
 
 
