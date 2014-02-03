@@ -93,8 +93,8 @@ class TestProjects(TestCase):
         self.user_2_org_repo = \
             factories.OrganizationRepositoryFactory.create(parent=self.user_2_org)
 
-    def test_repos_sync(self):
-        """User can sync repositories from GitHub."""
+    def test_repos_sync_and_view(self):
+        """User can sync and view repositories from GitHub."""
         user = self.user_1
         self.login(user_id=user.id)
 
@@ -111,11 +111,51 @@ class TestProjects(TestCase):
         assert user.organizations.count() == 2
         assert (set(org.gh_login for org in user.organizations) ==
                 {'pyconru', 'unistorage'})
-        assert (user.organizations.filter_by(gh_login='pyconru')
-                    .first().repositories.count() == 1)
-        assert (user.organizations.filter_by(gh_login='unistorage')
-                    .first().repositories.count() == 6)
+        pyconru_repos = user.organizations.filter_by(
+            gh_login='pyconru').first().repositories
+        unistorage_repos = user.organizations.filter_by(
+            gh_login='unistorage').first().repositories
+        assert pyconru_repos.count() == 1
+        assert unistorage_repos.count() == 6
         assert user.repos_last_synchronized_at
+
+        # Make sure that all the repositories are listed
+        data = self.w.get('/repositories/').context['repositories_by_owner']
+
+        assert set(data[user.gh_login]) == {
+            (repo.gh_id, repo.gh_full_name) for repo in user.repositories
+        }
+        assert set(data['pyconru']) == {
+            (repo.gh_id, repo.gh_full_name) for repo in pyconru_repos
+        }
+        assert set(data['unistorage']) == {
+            (repo.gh_id, repo.gh_full_name) for repo in unistorage_repos
+        }
+
+        # Create projects for some of the repositories
+        project_1 = factories.ProjectFactory.create(
+            owner=self.user_1,
+            gh_id=user.repositories[1].gh_id)
+        project_2 = factories.ProjectFactory.create(
+            owner=self.user_2,
+            gh_id=pyconru_repos[0].gh_id)
+        project_3 = factories.ProjectFactory.create(
+            owner=self.user_1,
+            gh_id=unistorage_repos[3].gh_id)
+
+        # And make sure that repositories for which projects were
+        # created are not listed
+        data = self.w.get('/repositories/').context['repositories_by_owner']
+
+        assert 'pyconru' not in data
+        assert set(data[user.gh_login]) == {
+            (repo.gh_id, repo.gh_full_name) for repo in user.repositories
+            if repo.gh_id != project_1.gh_id
+        }
+        assert set(data['unistorage']) == {
+            (repo.gh_id, repo.gh_full_name) for repo in unistorage_repos
+            if repo.gh_id != project_3.gh_id
+        }
 
     def test_project_creation(self):
         """User can create a project from repository."""
@@ -123,7 +163,7 @@ class TestProjects(TestCase):
 
         r = self.w.get('/').maybe_follow().click('Repositories')
 
-        form_id = 'org-repo-{}'.format(self.user_2_org_repo.id)
+        form_id = 'create-project-{}'.format(self.user_2_org_repo.gh_id)
 
         # Mock GitHub API call to add deploy key and submit the form
         gh_repo_mock = mock.Mock()
@@ -142,6 +182,37 @@ class TestProjects(TestCase):
         assert project.gh_key_id == fixtures.DEPLOY_KEY_DATA['id']
         assert project.rsa_public_key.startswith('ssh-rsa ')
         assert project.rsa_private_key.startswith('-----BEGIN RSA PRIVATE KEY-----')
+
+    def test_project_deletion(self):
+        """User can delete an owned project."""
+        project = factories.ProjectFactory.create(owner=self.user_1)
+        project_id = project.id
+        factories.MembershipFactory.create(user=self.user_2, project=project)
+
+        def get_settings_page(project):
+            return self.w.get('/').maybe_follow().click(
+                project.gh_full_name).maybe_follow().click('Settings')
+
+        self.login(user_id=self.user_2.id)
+        r = get_settings_page(project)
+        assert 'delete-project' not in r.forms
+        with mock.patch('flask.ext.wtf.csrf.validate_csrf', return_value=True):
+            r = self.w.post(
+                url_for('projects.delete_project', id=project.id), status='*')
+            assert r.status_code == 403
+
+        self.login(user_id=self.user_1.id)
+        r = get_settings_page(project)
+        form = r.forms['delete-project']
+        # Imitate JS logic:
+        form.action = url_for(
+            'projects.delete_project', id=project.id, _external=False)
+        assert form.action in r
+
+        with mock.patch.object(Project, 'gh'):
+            form.submit().follow()
+
+        assert not Project.query.get(project_id)
 
 
 class TestHooksManagement(TestCase):

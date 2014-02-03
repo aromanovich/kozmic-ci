@@ -27,24 +27,15 @@
   <div class="row">
     <div class="col-md-3">
       <div class="list-group" id="namespaces">
-        {% if current_user.repositories.first() %}
-          <a href="#{{ current_user.gh_login }}" class="list-group-item">
+        {% for gh_owner_login, repositories in repositories_by_owner.iteritems() %}
+          <a href="#{{ gh_owner_login }}" class="list-group-item">
             <h4 class="list-group-item-heading">
-              {{ current_user.gh_login }}
+              {{ gh_owner_login }}
             </h4>
             <p class="list-group-item-text">
-              {{ current_user.repositories.count() }} repositories
-            </p>
-          </a>
-        {% endif %}
-
-        {% for org in current_user.organizations %}
-          <a href="#{{ org.gh_login }}" class="list-group-item">
-            <h4 class="list-group-item-heading">
-              {{ org.gh_login }}
-            </h4>
-            <p class="list-group-item-text">
-              {{ org.repositories.count() }} repositories
+              {% with count = repositories|length %}
+                {{ count }} {% if count > 1 %}repositories{% else %}repository{% endif %}
+              {% endwith %}
             </p>
           </a>
         {% endfor %}
@@ -53,25 +44,19 @@
 
     <div class="col-md-9">
       <div class="tab-content">
-        {% if current_user.repositories.first() %}
-        <div class="tab-pane active" id="{{ current_user.gh_login }}">
-          <ul class="list-group">
-            {% for repo in current_user.repositories %}
-              {% with repo_type='org-repo' %}
-                {% include 'repos/_repo.html' %}
-              {% endwith %}
-            {% endfor %}
-          </ul>
-        </div>
-        {% endif %}
-
-        {% for org in current_user.organizations %}
-          <div class="tab-pane" id="{{ org.gh_login }}">
+        {% for gh_owner_login, repositories in repositories_by_owner.iteritems() %}
+          <div class="tab-pane {% if loop.first %}active{% endif %}" id="{{ gh_owner_login }}">
             <ul class="list-group">
-              {% for repo in org.repositories %}
-                {% with repo_type='org-repo' %}
-                  {% include 'repos/_repo.html' %}
-                {% endwith %}
+              {% for gh_id, gh_full_name in repositories %}
+                <li class="list-group-item">
+                  <form action="{{ url_for('.on', gh_id=gh_id) }}" method="POST"
+                        id="create-project-{{ gh_id }}">
+                    {{ gh_full_name }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="repo_full_name" value="{{ gh_full_name }}">
+                    <button type="submit" class="btn btn-sm btn-default">Create project</button>
+                  </form>
+                </li>
               {% endfor %}
             </ul>
           </div>

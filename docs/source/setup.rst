@@ -41,8 +41,8 @@ as an example. The following variables must be specified:
                                ``'mysql+pymysql://user:password@127.0.0.1/kozmic'``);
 * ``TAILER_URL_TEMPLATE``: URL template to be used to get a websocket URL for a job.
                            Must point to a :mod:`tailer` application instance and
-                           contain ``task_uuid`` variable. (e.g.,
-                           ``'ws://kozmic-ci.company.com:8080/{task_uuid}/'``);
+                           contain ``job_id`` variable. (e.g.,
+                           ``'ws://kozmic-ci.company.com:8080/{job_id}/'``);
 
 Default configuration expects to find an SMTP server on a local machine on port 25.
 It can be changed: http://pythonhosted.org/Flask-Mail/#configuring-flask-mail.

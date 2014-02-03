@@ -17,6 +17,10 @@ class DefaultConfig(object):
     KOZMIC_REDIS_PORT = 6379
     KOZMIC_REDIS_DATABASE = 0
     KOZMIC_STALL_TIMEOUT = 600
+    KOZMIC_ENABLE_EMAIL_NOTIFICATIONS = True
+
+    DOCKER_URL = 'unix://var/run/docker.sock'
+    DOCKER_API_VERSION = '1.8'
 
     BROKER_URL = 'redis://{host}:{port}/{db}'.format(
         host=KOZMIC_REDIS_HOST,
@@ -27,8 +31,11 @@ class DefaultConfig(object):
     CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
     CELERY_IGNORE_RESULT = True
     CELERY_DEFAULT_QUEUE = 'kozmic'
+
     TAILER_URL_TEMPLATE = None
-    MAIL_DEFAULT_SENDER = None  # _must_ be configured
+
+    MAIL_DEFAULT_SENDER = None  # must be configured if email
+                                # notifications are enabled
 
 
 class DevelopmentConfig(DefaultConfig):
@@ -49,3 +56,4 @@ class TestingConfig(DefaultConfig):
     MAIL_SUPPRESS_SEND = True
     MAIL_DEFAULT_SENDER = 'Kozmic CI <no-reply@kozmic.test>'
     CELERY_ALWAYS_EAGER = True
+    TAILER_URL_TEMPLATE = 'ws://127.0.0.1:8801/{job_id}/'

@@ -1,0 +1,25 @@
+# coding: utf-8
+from .config import DefaultConfig
+
+
+class Config(DefaultConfig):
+    SECRET_KEY = '...'
+    KOZMIC_GITHUB_CLIENT_ID = '...'
+    KOZMIC_GITHUB_CLIENT_SECRET = '...'
+    SERVER_NAME = '192.168.33.210'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://user:@192.168.33.10/kozmic'
+    TAILER_URL_TEMPLATE = 'ws://' + SERVER_NAME + ':8080/{job_id}/'
+    KOZMIC_REDIS_HOST = '192.168.33.20'
+    KOZMIC_REDIS_PORT = 6379
+    KOZMIC_REDIS_DATABASE = 0
+    BROKER_URL = 'redis://{host}:{port}/{db}'.format(
+        host=KOZMIC_REDIS_HOST,
+        port=KOZMIC_REDIS_PORT,
+        db=KOZMIC_REDIS_DATABASE)
+
+    KOZMIC_ENABLE_EMAIL_NOTIFICATIONS = False
+    # Or:
+    # MAIL_SERVER = '...'
+    # MAIL_PORT = '...'
+    # ...
+    # http://packages.python.org/Flask-Mail/#configuring-flask-mail

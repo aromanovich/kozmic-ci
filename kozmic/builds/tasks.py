@@ -21,13 +21,12 @@ import fcntl
 import select
 import Queue
 
-import tailf
-import docker
 import redis
 from flask import current_app
 from celery.utils.log import get_task_logger
+from docker import APIError as DockerAPIError
 
-from kozmic import db, celery
+from kozmic import db, celery, docker
 from kozmic.models import Build, Job, HookCall
 from . import get_ansi_to_html_converter
 
@@ -100,9 +99,8 @@ class Tailer(threading.Thread):
         self._redis_client.rpush(self._channel, line)
 
     def _kill_container(self):
-        client = docker.Client()
         logger.info('Tailer is killing %s', self._container)
-        client.kill(self._container)
+        docker.kill(self._container)
         logger.info('%s has been killed.', self._container)
 
     def run(self):
@@ -225,6 +223,9 @@ class Builder(threading.Thread):
         ``exc_info`` triple ``(type, value, traceback)``
         if something went wrong.
 
+    :param docker: Docker client
+    :type docker: :class:`docker.Client`
+
     :param message_queue: a queue to which put an identifier of the started
                           Docker container. Identifier is a dictionary returned
                           by :meth:`docker.Client.create_container`.
@@ -253,10 +254,11 @@ class Builder(threading.Thread):
     :param commit_sha: SHA of the commit to be checked out
     :type commit_sha: str
     """
-    def __init__(self, message_queue, rsa_private_key, passphrase,
+    def __init__(self, docker, message_queue, rsa_private_key, passphrase,
                  docker_image, script, working_dir, clone_url, commit_sha,
                  remove_container=True):
         threading.Thread.__init__(self)
+        self._docker = docker
         self._rsa_private_key = rsa_private_key
         self._passphrase = passphrase
         self._docker_image = docker_image
@@ -310,10 +312,8 @@ class Builder(threading.Thread):
             log.write('')
         os.chmod(log_path, 0o664)
 
-        client = docker.Client()
-
         logger.info('Starting Docker process...')
-        self.container = client.create_container(
+        self.container = self._docker.create_container(
             self._docker_image,
             command='bash /kozmic/script-starter.sh',
             volumes={'/kozmic': {}})
@@ -321,13 +321,13 @@ class Builder(threading.Thread):
         self._message_queue.put(self.container, block=True, timeout=60)
         self._message_queue.join()
 
-        client.start(self.container, binds={self._working_dir: '/kozmic'})
+        self._docker.start(self.container, binds={self._working_dir: '/kozmic'})
         logger.info('Docker process %s has started.', self.container)
 
-        return_code = client.wait(self.container)
-        logger.info('Docker process log: %s', client.logs(self.container))
+        return_code = self._docker.wait(self.container)
+        logger.info('Docker process log: %s', self._docker.logs(self.container))
         if self._remove_container:
-            client.remove_container(self.container)
+            self._docker.remove_container(self.container)
         logger.info('Docker process %s has finished with return code %i.',
                     self.container, return_code)
         logger.info('Builder has finished.')
@@ -345,6 +345,7 @@ def _run(redis_client, channel, stall_timeout,
         with create_temp_dir() as working_dir:
             message_queue = Queue.Queue()
             builder = Builder(
+                docker=docker._get_current_object(),  # `docker` is a local proxy
                 rsa_private_key=rsa_private_key,
                 passphrase=passphrase,
                 clone_url=clone_url,
@@ -394,7 +395,12 @@ def _run(redis_client, channel, stall_timeout,
                     # (it will be catched in the outer try-except)
                     raise builder.exc_info[1], None, builder.exc_info[2]
                 else:
-                    yield builder.return_code, stdout, builder.container
+                    try:
+                        yield builder.return_code, stdout, builder.container
+                    except:
+                        return
+                        # otherwise we get "generator didn't stop after
+                        # throw()" error if nested code raised exception
     except:
         stdout += ('\nSorry, something went wrong. We are notified of '
                    'the issue and will fix it soon.')
@@ -458,14 +464,13 @@ def do_job(hook_call_id):
         clone_url=hook.project.gh_clone_url,
         commit_sha=hook_call.build.gh_commit_sha)
 
-    client = docker.Client()
     logger.info('Pulling %s image...', hook.docker_image)
     try:
-        client.pull(hook.docker_image)
+        docker.pull(hook.docker_image)
         # Make sure that image has been successfully pulled by calling
         # `inspect_image` on it:
-        client.inspect_image(hook.docker_image)
-    except docker.APIError as e:
+        docker.inspect_image(hook.docker_image)
+    except DockerAPIError as e:
         logger.info('Failed to pull %s: %s.', hook.docker_image, e)
         job.finished(1)
         job.stdout = str(e)
@@ -477,7 +482,7 @@ def do_job(hook_call_id):
     install_stdout = ''
     if job.hook_call.hook.install_script:
         cached_image = 'kozmic-cache/{}'.format(job.get_cache_id())
-        if client.images(cached_image):
+        if docker.images(cached_image):
             install_stdout = ('Skipping install script as tracked files '
                               'did not change...\n\n')
         else:
@@ -487,14 +492,14 @@ def do_job(hook_call_id):
                       remove_channel=False,
                       **kwargs) as (return_code, install_stdout, container):
                 if return_code == 0:
-                    client.commit(container['Id'], repository=cached_image)
-                    client.remove_container(container)
+                    docker.commit(container['Id'], repository=cached_image)
+                    docker.remove_container(container)
                 else:
                     job.finished(return_code)
                     job.stdout = install_stdout
                     db.session.commit()
                     return
-            assert client.images(cached_image)
+            assert docker.images(cached_image)
         docker_image = cached_image
     else:
         docker_image = job.hook_call.hook.docker_image

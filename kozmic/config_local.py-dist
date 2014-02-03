@@ -6,7 +6,7 @@ class DevelopmentConfig(DevelopmentConfig):
     KOZMIC_GITHUB_CLIENT_ID = 'client-id'
     KOZMIC_GITHUB_CLIENT_SECRET = 'client-secret'
     SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://user:@192.168.33.10/kozmic'
-    TAILER_URL_TEMPLATE = 'ws://127.0.0.1:8801/{task_uuid}/'
+    TAILER_URL_TEMPLATE = 'ws://127.0.0.1:8801/{job_id}/'
 
 
 class TestingConfig(TestingConfig):

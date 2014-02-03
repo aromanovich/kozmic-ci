@@ -7,9 +7,11 @@ kozmic
 """
 import os
 
+import docker as _docker
 import flask
 import raven.contrib
 from celery import Celery, Task
+from werkzeug.local import LocalProxy
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.migrate import Migrate
 from flask.ext.login import LoginManager
@@ -26,6 +28,9 @@ principal = Principal()
 celery = Celery()
 csrf = CsrfProtect()
 mail = Mail()
+docker = LocalProxy(
+    lambda: _docker.Client(base_url=flask.current_app.config['DOCKER_URL'],
+                           version=flask.current_app.config['DOCKER_API_VERSION']))
 
 
 def create_app(config=None):
