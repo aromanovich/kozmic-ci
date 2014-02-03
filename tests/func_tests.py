@@ -208,7 +208,9 @@ class TestProjects(TestCase):
         form.action = url_for(
             'projects.delete_project', id=project.id, _external=False)
         assert form.action in r
-        return form.submit().follow()
+
+        with mock.patch.object(Project, 'gh'):
+            form.submit().follow()
 
         assert not Project.query.get(project_id)
 
