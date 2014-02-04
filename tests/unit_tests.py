@@ -163,6 +163,8 @@ class TestUserDB(TestCase, TestUserUtils):
             owner=self.user_1)  # project from team #267031 with admin permission
 
         self.stub_teams_and_their_repos()
+        httpretty.register_uri(
+            httpretty.GET, 'https://api.github.com/user/repos', json.dumps([]))
 
         self.user_2.sync_memberships_with_github()
         db.session.commit()

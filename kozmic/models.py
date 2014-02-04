@@ -23,6 +23,16 @@ from . import db, mail, perms
 from .utils import JSONEncodedDict
 
 
+# XXX
+# TODO Make a pull request
+def iter_collaborators(self, number=-1, etag=None):
+    url = self._build_url('collaborators', base_url=self._api)
+    return self._iter(int(number), url, github3.users.User, {}, etag)
+
+github3.repos.Repository.iter_collaborators = iter_collaborators
+# /XXX
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -181,12 +191,12 @@ class User(HasRepositories, db.Model, UserMixin):
         return gh_orgs, gh_repos_by_org_id
 
     def get_gh_repos(self):
-        """Retrieves data from GitHub API and returns list of
-        user repositories.
+        """Retrieves data from GitHub API and returns a list of
+        the user owned repositories.
 
         :rtype: list of :class:`github3.repo.Repository`
         """
-        return list(self.gh.iter_repos(self.gh_login))
+        return list(self.gh.iter_repos(type='owner'))
 
     def sync_memberships_with_github(self):
         """Does the same as :meth:`Project.sync_memberships_with_github`,
@@ -196,9 +206,18 @@ class User(HasRepositories, db.Model, UserMixin):
             db.session.delete(membership)
 
         github_data = collections.defaultdict(lambda: False)
+
         for gh_team in self.gh.iter_user_teams():
             for gh_repo in gh_team.iter_repos():
                 github_data[gh_repo.id] |= gh_team.permission in ('admin', 'push')
+
+        for gh_repo in self.gh.iter_repos(type='all'):
+            # iter_repos lists only repositories owned by users, not ogranizations.
+            # Type "all" means both repositories owned by the logged in user and
+            # repositories owned by another users in which the logged in user
+            # is a collaborator.
+            # Collaborator of a user repository always have push rights:
+            github_data[gh_repo.id] = True
 
         for gh_repo_id, can_manage in github_data.iteritems():
             project = Project.query.filter_by(gh_id=gh_repo_id).first()
@@ -354,24 +373,29 @@ class Project(db.Model):
         for membership in self.memberships:
             db.session.delete(membership)
 
-        extra_teams = []
-        gh_owner = self.gh.owner
-        if gh_owner.type == 'Organization':
+        github_data = collections.defaultdict(lambda: False)
+
+        if self.gh.owner.type == 'Organization':
+            gh_teams = self.gh.iter_teams()
             # The Owners team is not listed in /repos/:org/:repo/teams and
             # it is "expected behaviour currently", but it's members
             # definitely have admin access to the repository.
             # The workaround is to find the Owners team "manually" by
             # iterating through all the organization teams.
-            for gh_team in self.owner.gh.organization(gh_owner.login).iter_teams():
+            for gh_team in self.owner.gh.organization(self.gh.owner.login).iter_teams():
                 # Note: owners team can not be renamed, so it's completely
                 # OK to search for it by name
                 if gh_team.name == 'Owners':
-                    extra_teams.append(gh_team)
+                    gh_teams = itertools.chain([gh_team], gh_teams)
 
-        github_data = collections.defaultdict(lambda: False)
-        for gh_team in itertools.chain(extra_teams, self.gh.iter_teams()):
-            for gh_user in gh_team.iter_members():
-                github_data[gh_user.id] |= gh_team.permission in ('admin', 'push')
+            for gh_team in gh_teams:
+                for gh_user in gh_team.iter_members():
+                    github_data[gh_user.id] |= gh_team.permission in ('admin', 'push')
+
+        elif self.gh.owner.type == 'User':
+            for gh_user in self.gh.iter_collaborators():
+                # Collaborator of a user repository always have push right
+                github_data[gh_user.id] = True
 
         for gh_user_id, can_manage in github_data.iteritems():
             user = User.query.filter_by(gh_id=gh_user_id).first()
