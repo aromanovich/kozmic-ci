@@ -171,7 +171,9 @@ class TestProjects(TestCase):
             return_value=github3.users.Key(fixtures.DEPLOY_KEY_DATA))
 
         with mock.patch.object(Project, 'gh', gh_repo_mock):
-            r = r.forms[form_id].submit().follow()
+            with mock.patch.object(Project, 'sync_memberships_with_github') as sync_mock:
+                r = r.forms[form_id].submit().follow()
+        sync_mock.assert_called_once_with()
 
         assert self.user_2.owned_projects.count() == 1
         project = self.user_2.owned_projects.first()
@@ -455,65 +457,22 @@ class TestMembersManagement(TestCase):
         assert 'ramm' in member_divs[1].text_content()
         assert 'vsokolov' in member_divs[2].text_content()
 
-    def test_manager_can_add_membership(self):
-        """Manager can add a member to a project."""
-        self.login(user_id=self.aromanovich.id)
+    def test_manager_can_sync_members_with_github(self):
+        """Manager can sync members with GitHub."""
+        factories.MembershipFactory.create(
+            user=self.vsokolov, project=self.project)
+        factories.MembershipFactory.create(
+            user=self.ramm, project=self.project, allows_management=True)
 
-        assert self.project.members.count() == 0
-
-        member_form = (self.get_project_settings_page(self.project)
-                           .click('Add a new member').form)
-
-        member_form['gh_login'] = 'johndoe'
-        assert member_form.submit().flashes == [
-            ('warning', 'User with GitHub login "johndoe" was not found.')
-        ]
-
-        member_form['gh_login'] = 'ramm'
-        member_form.submit().follow()
-        member_form['gh_login'] = 'vsokolov'
-        member_form['is_manager'] = True
-        member_form.submit().follow()
-
-        assert self.project.members.count() == 2
-
-        ramm_membership = self.project.memberships.filter_by(
-            user=self.ramm).first()
-        assert not ramm_membership.allows_management
-        vsokolov_membership = self.project.memberships.filter_by(
-            user=self.vsokolov).first()
-        assert vsokolov_membership.allows_management
-
-    def test_manager_can_edit_membership(self):
-        """Manager can edit a membership."""
-        self.login(user_id=self.aromanovich.id)
-
-        for user in [self.ramm, self.vsokolov]:
-            factories.MembershipFactory.create(user=user, project=self.project)
-
+        self.login(user_id=self.vsokolov.id)
         settings_page = self.get_project_settings_page(self.project)
-        form = settings_page.click(
-            linkid='edit-member-{}'.format(self.ramm.id)).form
-        form['is_manager'] = True
-        form.submit()
+        assert 'sync-memberships' not in settings_page.forms
 
-        ramm_membership = self.project.memberships.filter_by(
-            user=self.ramm).first()
-        assert ramm_membership.allows_management
-
-    def test_manager_can_delete_membership(self):
-        """Manager can delete a project member."""
-        self.login(user_id=self.aromanovich.id)
-
-        for user in [self.ramm, self.vsokolov]:
-            factories.MembershipFactory.create(user=user, project=self.project)
-
+        self.login(user_id=self.ramm.id)
         settings_page = self.get_project_settings_page(self.project)
-
-        form_id = 'delete-member-{}'.format(self.ramm.id)
-        settings_page.forms[form_id].submit().follow()
-
-        assert self.ramm not in self.project.members
+        with mock.patch.object(Project, 'sync_memberships_with_github') as sync_mock:
+            settings_page.forms['sync-memberships'].submit()
+        sync_mock.assert_called_once_with()
 
 
 class TestGitHubHooks(TestCase):

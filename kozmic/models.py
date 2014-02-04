@@ -202,7 +202,7 @@ class User(HasRepositories, db.Model, UserMixin):
 
         for gh_repo_id, can_manage in github_data.iteritems():
             project = Project.query.filter_by(gh_id=gh_repo_id).first()
-            if not project:
+            if not project or project.owner_id == self.id:
                 continue
             membership = Membership(
                 project=project,
@@ -375,7 +375,7 @@ class Project(db.Model):
 
         for gh_user_id, can_manage in github_data.iteritems():
             user = User.query.filter_by(gh_id=gh_user_id).first()
-            if not user:
+            if not user or user.id == self.owner_id:
                 continue
             membership = Membership(
                 project=self,

@@ -228,52 +228,18 @@ def delete_hook(project_id, hook_id):
     return redirect(url_for('.settings', id=project_id))
 
 
-@bp.route('/<int:project_id>/members/add/', methods=('GET', 'POST'))
-def add_membership(project_id):
-    project = get_project(project_id, for_management=True)
+@bp.route('/<int:id>/memberships/sync/', methods=('POST',))
+def sync_memberships(id):
+    project = get_project(id, for_management=True)
 
-    form = MemberForm(request.form)
-    if form.validate_on_submit():
-        gh_login = form.gh_login.data
-        user = User.query.filter_by(gh_login=gh_login).first()
-        if user:
-            membership = project.memberships.filter_by(user=user).first()
-            if not membership and user != project.owner:
-                membership = Membership(
-                    user=user,
-                    project=project,
-                    allows_management=form.is_manager.data)
-                db.session.add(membership)
-                db.session.commit()
-            return redirect(url_for('.settings', id=project_id))
-        else:
-            flash('User with GitHub login "{}" was not found.'.format(gh_login),
-                  'warning')
-    return render_template(
-        'projects/add-member.html', project=project, form=form)
-
-
-@bp.route('/<int:project_id>/members/<int:user_id>/edit/', methods=('GET', 'POST'))
-def edit_membership(project_id, user_id):
-    project = get_project(project_id, for_management=True)
-    membership = project.memberships.filter_by(user_id=user_id).first_or_404()
-
-    form = MemberForm(request.form, is_manager=membership.allows_management)
-    del form.gh_login
-    if form.validate_on_submit():
-        membership.allows_management = form.is_manager.data
-        db.session.add(membership)
+    try:
+        project.sync_memberships_with_github()
+    except github3.GitHubError as exc:
+        db.session.rollback()
+        flash('Something went wrong (probably there was a problem '
+              'communicating with the GitHub API). Please try again later.',
+              'warning')
+    else:
         db.session.commit()
-        return redirect(url_for('.settings', id=project_id))
-    return render_template(
-        'projects/edit-member.html', project=project,
-        member=membership.user, form=form)
 
-
-@bp.route('/<int:project_id>/members/<int:user_id>/delete/', methods=('GET', 'POST'))
-def delete_membership(project_id, user_id):
-    project = get_project(project_id, for_management=True)
-    membership = project.memberships.filter_by(user_id=user_id).first_or_404()
-    db.session.delete(membership)
-    db.session.commit()
-    return redirect(url_for('.settings', id=project_id))
+    return redirect(url_for('.settings', id=id))

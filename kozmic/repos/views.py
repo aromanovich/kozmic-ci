@@ -52,7 +52,7 @@ def sync():
     the user has admin access.
     """
     # Delete all the old repositories and organizations
-    # (don't do batch delete to get ORM-level cascades working)
+    # (don't do batch delete to let ORM-level cascades work)
     for repo in current_user.repositories:
         db.session.delete(repo)
     for org in current_user.organizations:
@@ -129,18 +129,26 @@ def on(gh_id):
         gh_key = project.gh.create_key('Kozmic CI', project.rsa_public_key)
         project.gh_key_id = gh_key.id
     except github3.GitHubError as exc:
-        logger.warning(
-            'GitHub API call to add {project!r}\'s deploy key has failed. '
-            'The current user is {user!r}. The exception was '
-            '"{exc!r} and with errors {errors!r}.".'.format(
-                project=project,
-                user=current_user,
-                exc=exc,
-                errors=exc.errors))
         db.session.rollback()
+        logger.warning(
+            'GitHub API call to add {project!r}\'s deploy key has failed '
+            'due to {exc!r}. Errors: {exc.errors!r}'.format(
+                project=project, exc=exc))
         flash('Sorry, failed to create a project. Please try again later.',
               'warning')
-    else:
-        db.session.commit()
+        return redirect(url_for('.index'))
 
-    return redirect(url_for('index'))
+    try:
+        project.sync_memberships_with_github()
+    except github3.GitHubError as exc:
+        db.session.rollback()
+        logger.warning(
+            'Failed to synchronize {project!r}\'s memberships with GitHub '
+            'due to {exc!r}. Errors: {exc.errors!r}'.format(
+                project=project, exc=exc))
+        flash('Sorry, failed to create a project. Please try again later.',
+              'warning')
+        return redirect(url_for('.index'))
+
+    db.session.commit()
+    return redirect(url_for('projects.index'))

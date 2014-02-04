@@ -103,10 +103,6 @@ body {
   margin-top: 0;
 }
 
-.members .edit {
-  margin-right: 5px;
-}
-
 #install_script, #build_script {
   height: 130px;
   font-family: monospace;
