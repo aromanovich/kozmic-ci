@@ -19,6 +19,15 @@
           </a>
         {% endfor %}
       </div>
+      <center>
+        <form action="{{ url_for('accounts.sync_memberships') }}" class="inline"
+              method="POST" id="sync-user-memberships">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-default">
+            <span class="glyphicon glyphicon-refresh"></span> Synchronize projects with GitHub
+          </button>
+        </form>
+      </center>
     </div>
 
     <div class="col-md-9">

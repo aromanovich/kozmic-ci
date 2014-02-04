@@ -145,8 +145,10 @@
                     form_type="basic",
                     horizontal_columns=('lg', 2, 10),
                     enctype=None,
+                    id=None,
                     button_map={}) %}
 <form
+  {%- if id %} id="{{id}}"{% endif -%}
   {%- if action %} action="{{action}}"{% endif -%}
   {%- if method %} method="{{method}}"{% endif %}
   class="form

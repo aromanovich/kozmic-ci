@@ -54,7 +54,9 @@ class TestUsers(TestCase):
             httpretty.GET, 'https://api.github.com/user', fixtures.USER_JSON)
 
         # Visit our `redirect_uri` (pretending being GitHub)
-        r = self.w.get('{}?code={}'.format(redirect_uri, code))
+        with mock.patch.object(User, 'sync_memberships_with_github') as sync_mock:
+            r = self.w.get('{}?code={}'.format(redirect_uri, code))
+        sync_mock.assert_called_once_with()
 
         latest_requests = httpretty.httpretty.latest_requests
 
@@ -92,6 +94,13 @@ class TestProjects(TestCase):
         self.user_2_org = factories.OrganizationFactory.create(user=self.user_2)
         self.user_2_org_repo = \
             factories.OrganizationRepositoryFactory.create(parent=self.user_2_org)
+
+    def test_projects_sync(self):
+        """User can sync projects with GitHub."""
+        self.login(user_id=self.user_1.id)
+        with mock.patch.object(User, 'sync_memberships_with_github') as sync_mock:
+            self.w.get('/').maybe_follow().forms['sync-user-memberships'].submit()
+        sync_mock.assert_called_once_with()
 
     def test_repos_sync_and_view(self):
         """User can sync and view repositories from GitHub."""
@@ -256,7 +265,7 @@ class TestHooksManagement(TestCase):
         self.login(user_id=self.user.id)
 
         settings_page = self.get_project_settings_page(self.project)
-        hook_form = settings_page.click('Add a new hook').form
+        hook_form = settings_page.click('Add a new hook').forms['hook-form']
 
         # Fill the hook creation form
         hook_data = {
@@ -318,7 +327,7 @@ class TestHooksManagement(TestCase):
 
         # Fill the hook form
         link_id = 'edit-hook-{}'.format(hook_1.id)
-        hook_form = settings_page.click(linkid=link_id).form
+        hook_form = settings_page.click(linkid=link_id).forms['hook-form']
         hook_form['title'] == hook_1.title
         hook_form['title'] = 'PEP 8 check'
         hook_form['build_script'] = '#!/bin/sh\r\npep8 app.py'
@@ -386,13 +395,13 @@ class TestHooksManagement(TestCase):
         settings_page = self.get_project_settings_page(self.project)
         link_id = 'edit-hook-{}'.format(hook.id)
 
-        hook_form = settings_page.click(linkid=link_id).form
+        hook_form = settings_page.click(linkid=link_id).forms['hook-form']
         hook_form['tracked_files'] = ''
         hook_form.submit()
 
         assert not hook.tracked_files.all()
 
-        hook_form = settings_page.click(linkid=link_id).form
+        hook_form = settings_page.click(linkid=link_id).forms['hook-form']
         hook_form['tracked_files'] = ('./requirements/basic.txt\n'
                                       'requirements/basic.txt\n'
                                       '././a/../requirements/dev.txt')
@@ -403,7 +412,7 @@ class TestHooksManagement(TestCase):
             'requirements/dev.txt',
         }
 
-        hook_form = settings_page.click(linkid=link_id).form
+        hook_form = settings_page.click(linkid=link_id).forms['hook-form']
         assert set(hook_form['tracked_files'].value.splitlines()) == {
             'requirements/basic.txt',
             'requirements/dev.txt',
@@ -466,12 +475,12 @@ class TestMembersManagement(TestCase):
 
         self.login(user_id=self.vsokolov.id)
         settings_page = self.get_project_settings_page(self.project)
-        assert 'sync-memberships' not in settings_page.forms
+        assert 'sync-project-memberships' not in settings_page.forms
 
         self.login(user_id=self.ramm.id)
         settings_page = self.get_project_settings_page(self.project)
         with mock.patch.object(Project, 'sync_memberships_with_github') as sync_mock:
-            settings_page.forms['sync-memberships'].submit()
+            settings_page.forms['sync-project-memberships'].submit()
         sync_mock.assert_called_once_with()
 
 

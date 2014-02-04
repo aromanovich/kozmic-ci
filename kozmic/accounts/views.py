@@ -16,3 +16,18 @@ def settings():
         flash('Your settings have been saved.', category='success')
         return redirect(url_for('.settings'))
     return render_template('accounts/settings.html', form=form)
+
+
+@bp.route('/memberships/sync/', methods=('POST',))
+def sync_memberships():
+    try:
+        current_user.sync_memberships_with_github()
+    except github3.GitHubError as exc:
+        db.session.rollback()
+        flash('Something went wrong (probably there was a problem '
+              'communicating with the GitHub API). Please try again later.',
+              'warning')
+    else:
+        db.session.commit()
+
+    return redirect(request.referrer or url_for('projects.index'))

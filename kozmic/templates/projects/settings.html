@@ -77,10 +77,10 @@
 
   {% if is_current_user_a_manager %}
     <form action="{{ url_for('.sync_memberships', id=project.id) }}"
-          method="POST" id="sync-memberships">
+          method="POST" id="sync-project-memberships">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-default">
-        <span class="glyphicon glyphicon-refresh"></span> Synchronize with GitHub
+        <span class="glyphicon glyphicon-refresh"></span> Synchronize members with GitHub
       </button>
     </form>
   {% endif %}
