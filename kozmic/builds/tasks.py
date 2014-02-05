@@ -450,6 +450,7 @@ def do_job(hook_call_id):
     db.session.commit()
 
     hook = hook_call.hook
+    project = hook.project
     config = current_app.config
     redis_client = redis.StrictRedis(host=config['KOZMIC_REDIS_HOST'],
                                      port=config['KOZMIC_REDIS_PORT'],
@@ -459,9 +460,9 @@ def do_job(hook_call_id):
         redis_client=redis_client,
         channel=job.task_uuid,
         stall_timeout=config['KOZMIC_STALL_TIMEOUT'],
-        rsa_private_key=hook.project.rsa_private_key,
-        passphrase=hook.project.passphrase,
-        clone_url=hook.project.gh_clone_url,
+        rsa_private_key=project.rsa_private_key,
+        passphrase=project.passphrase,
+        clone_url=project.gh_clone_url,
         commit_sha=hook_call.build.gh_commit_sha)
 
     logger.info('Pulling %s image...', hook.docker_image)
@@ -478,6 +479,8 @@ def do_job(hook_call_id):
         return
     else:
         logger.info('%s image has been pulled.', hook.docker_image)
+
+    project.ensure_deploy_key()
 
     install_stdout = ''
     if job.hook_call.hook.install_script:

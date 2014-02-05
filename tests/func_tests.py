@@ -172,17 +172,19 @@ class TestProjects(TestCase):
 
         r = self.w.get('/').maybe_follow().click('Repositories')
 
-        form_id = 'create-project-{}'.format(self.user_2_org_repo.gh_id)
+        def ensure_deploy_key(project):
+            project._generate_deploy_key(1024, 'passphrase')
+            project.gh_key_id = 1
+            return True
 
-        # Mock GitHub API call to add deploy key and submit the form
-        gh_repo_mock = mock.Mock()
-        gh_repo_mock.create_key = mock.Mock(
-            return_value=github3.users.Key(fixtures.DEPLOY_KEY_DATA))
-
-        with mock.patch.object(Project, 'gh', gh_repo_mock):
-            with mock.patch.object(Project, 'sync_memberships_with_github') as sync_mock:
-                r = r.forms[form_id].submit().follow()
+        with mock.patch.object(Project, 'gh'), \
+             mock.patch.object(Project, 'sync_memberships_with_github') as sync_mock, \
+             mock.patch.object(Project, 'ensure_deploy_key', autospec=True,
+                               side_effect=ensure_deploy_key) as ensure_deploy_key_mock:
+                form_id = 'create-project-{}'.format(self.user_2_org_repo.gh_id)
+                r.forms[form_id].submit().follow()
         sync_mock.assert_called_once_with()
+        ensure_deploy_key_mock.assert_called_once_with(mock.ANY)
 
         assert self.user_2.owned_projects.count() == 1
         project = self.user_2.owned_projects.first()
@@ -190,7 +192,7 @@ class TestProjects(TestCase):
         assert project.gh_name == self.user_2_org_repo.gh_name
         assert project.gh_full_name == self.user_2_org_repo.gh_full_name
         assert project.gh_login == self.user_2_org_repo.parent.gh_login
-        assert project.gh_key_id == fixtures.DEPLOY_KEY_DATA['id']
+        assert project.gh_key_id == 1
         assert project.rsa_public_key.startswith('ssh-rsa ')
         assert project.rsa_private_key.startswith('-----BEGIN RSA PRIVATE KEY-----')
 
@@ -505,11 +507,11 @@ class TestGitHubHooks(TestCase):
         gh_repo_mock = self._create_gh_repo_mock(commit_data)
         head_sha = commit_data['sha']
 
-        with mock.patch.object(Project, 'gh', gh_repo_mock):
-            with mock.patch('kozmic.builds.tasks.do_job') as do_job_mock:
-                r = self.w.post_json(
-                    url_for('builds.hook', id=self.hook_1.id, _external=True),
-                    fixtures.PULL_REQUEST_HOOK_CALL_DATA)
+        with mock.patch.object(Project, 'gh', gh_repo_mock), \
+             mock.patch('kozmic.builds.tasks.do_job') as do_job_mock:
+            r = self.w.post_json(
+                url_for('builds.hook', id=self.hook_1.id, _external=True),
+                fixtures.PULL_REQUEST_HOOK_CALL_DATA)
 
         assert r.status_code == 200
         assert r.body == 'OK'
@@ -537,19 +539,19 @@ class TestGitHubHooks(TestCase):
         gh_repo_mock = self._create_gh_repo_mock(commit_data)
         head_sha = commit_data['sha']
 
-        with mock.patch.object(Project, 'gh', gh_repo_mock):
+        with mock.patch.object(Project, 'gh', gh_repo_mock), \
+             mock.patch('kozmic.builds.tasks.do_job') as do_job_mock:
             push_hook_call_data = copy.deepcopy(fixtures.PUSH_HOOK_CALL_DATA)
             push_hook_call_data['ref'] = 'refs/heads/{}'.format(
-                fixtures.PULL_REQUEST_HOOK_CALL_DATA['pull_request']['head']['ref'])
+            fixtures.PULL_REQUEST_HOOK_CALL_DATA['pull_request']['head']['ref'])
 
-            with mock.patch('kozmic.builds.tasks.do_job') as do_job_mock:
-                for hook in (self.hook_1, self.hook_2):
-                    self.w.post_json(
-                        url_for('builds.hook', id=hook.id, _external=True),
-                        push_hook_call_data)
+            for hook in (self.hook_1, self.hook_2):
                 self.w.post_json(
-                    url_for('builds.hook', id=self.hook_1.id, _external=True),
-                    fixtures.PULL_REQUEST_HOOK_CALL_DATA)
+                    url_for('builds.hook', id=hook.id, _external=True),
+                    push_hook_call_data)
+            self.w.post_json(
+                url_for('builds.hook', id=self.hook_1.id, _external=True),
+                fixtures.PULL_REQUEST_HOOK_CALL_DATA)
 
         build = self.project.builds.first()
         hook_call_1 = self.hook_1.calls.first()

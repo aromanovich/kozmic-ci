@@ -3,8 +3,7 @@ import logging
 import collections
 
 import github3
-from Crypto.PublicKey import RSA
-from flask import current_app, request, render_template, redirect, url_for, abort
+from flask import current_app, flash, request, render_template, redirect, url_for, abort
 from flask.ext.login import current_user
 
 from kozmic import db
@@ -98,7 +97,6 @@ def on(gh_id):
                                 .with_entities(Organization.Repository).first())
 
     if not repo:
-        # If repository is not found, show 404
         abort(404)
 
     if Project.query.filter_by(gh_id=repo.gh_id).first():
@@ -116,39 +114,18 @@ def on(gh_id):
         gh_login=repo.parent.gh_login,
         gh_clone_url=repo.gh_clone_url,
         gh_key_id=-1)  # -1 is just some integer to avoid integrity error
-
-    rsa_key = RSA.generate(2048)
-    project.rsa_private_key = rsa_key.exportKey(
-        format='PEM', passphrase=project.passphrase)
-    project.rsa_public_key = rsa_key.publickey().exportKey(format='OpenSSH')
-
     db.session.add(project)
+
+    ok_to_commit = project.ensure_deploy_key()
     db.session.flush()
 
-    try:
-        gh_key = project.gh.create_key('Kozmic CI', project.rsa_public_key)
-        project.gh_key_id = gh_key.id
-    except github3.GitHubError as exc:
+    ok_to_commit = ok_to_commit and project.sync_memberships_with_github()
+
+    if ok_to_commit:
+        db.session.commit()
+        return redirect(url_for('projects.index'))
+    else:
         db.session.rollback()
-        logger.warning(
-            'GitHub API call to add {project!r}\'s deploy key has failed '
-            'due to {exc!r}. Errors: {exc.errors!r}'.format(
-                project=project, exc=exc))
         flash('Sorry, failed to create a project. Please try again later.',
               'warning')
         return redirect(url_for('.index'))
-
-    try:
-        project.sync_memberships_with_github()
-    except github3.GitHubError as exc:
-        db.session.rollback()
-        logger.warning(
-            'Failed to synchronize {project!r}\'s memberships with GitHub '
-            'due to {exc!r}. Errors: {exc.errors!r}'.format(
-                project=project, exc=exc))
-        flash('Sorry, failed to create a project. Please try again later.',
-              'warning')
-        return redirect(url_for('.index'))
-
-    db.session.commit()
-    return redirect(url_for('projects.index'))

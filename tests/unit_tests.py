@@ -617,37 +617,28 @@ class TestBuildTaskDB(TestCase):
 
     def test_do_job(self):
         with SessionScope(self.db):
-            set_status_patcher = mock.patch.object(Build, 'set_status')
-            builder_patcher = mock.patch('kozmic.builds.tasks.Builder', new=BuilderStub)
-            tailer_patcher = mock.patch('kozmic.builds.tasks.Tailer')
-            docker_patcher = mock.patch.multiple(
-                'docker.Client', pull=mock.DEFAULT, inspect_image=mock.DEFAULT)
-
-            set_status_mock = set_status_patcher.start()
-            builder_patcher.start()
-            tailer_patcher.start()
-            docker_patcher.start()
-            try:
+            with mock.patch.object(Build, 'set_status') as set_status_mock, \
+                 mock.patch.object(Project, 'ensure_deploy_key') as ensure_deploy_key_mock, \
+                 mock.patch('kozmic.builds.tasks.Builder', new=BuilderStub), \
+                 mock.patch('kozmic.builds.tasks.Tailer'), \
+                 mock.patch.multiple('docker.Client', pull=mock.DEFAULT,
+                                     inspect_image=mock.DEFAULT):
                 kozmic.builds.tasks.do_job(hook_call_id=self.hook_call.id)
-            finally:
-                docker_patcher.stop()
-                tailer_patcher.stop()
-                builder_patcher.stop()
-                set_status_patcher.stop()
         self.db.session.rollback()
 
         assert self.build.jobs.count() == 1
         job = self.build.jobs.first()
         assert job.return_code == 0
         assert job.stdout == 'Everything went great!\nGood bye.'
-        build_id = self.build.id
+        build_number = self.build.number
+        ensure_deploy_key_mock.assert_called_once_with()
         set_status_mock.assert_has_calls([
             mock.call(
                 'pending',
-                description='Kozmic build #{} is pending'.format(build_id)),
+                description='Kozmic build #{} is pending'.format(build_number)),
             mock.call(
                 'success',
-                description='Kozmic build #{} has passed'.format(build_id)),
+                description='Kozmic build #{} has passed'.format(build_number)),
         ])
 
     @pytest.mark.docker
@@ -663,18 +654,24 @@ class TestBuildTaskDB(TestCase):
         job_id_before_restart = job.id
 
         with SessionScope(self.db):
-            set_status_patcher = mock.patch.object(Build, 'set_status')
-            _run_patcher = mock.patch('kozmic.builds.tasks._run')
+#            set_status_patcher = mock.patch.object(Build, 'set_status')
+            #_run_patcher = mock.patch('kozmic.builds.tasks._run')
 
-            set_status_mock = set_status_patcher.start()
-            _run_mock = _run_patcher.start()
-            _run_mock.return_value.__enter__ = mock.MagicMock(
-                side_effect=lambda *args, **kwargs: (0, 'output', {'Id': 'container-id'}))
-            try:
+            #set_status_mock = set_status_patcher.start()
+            #_run_mock = _run_patcher.start()
+            #_run_mock.return_value.__enter__ = mock.MagicMock(
+                #side_effect=lambda *args, **kwargs: (0, 'output', {'Id': 'container-id'}))
+            #try:
+                #kozmic.builds.tasks.restart_job(job.id)
+            #finally:
+                #_run_mock.stop()
+                #set_status_patcher.stop()
+            with mock.patch.object(Build, 'set_status') as set_status_mock, \
+                 mock.patch('kozmic.builds.tasks._run') as _run_mock, \
+                 mock.patch.object(Project, 'ensure_deploy_key') as ensure_deploy_key_mock:
+                _run_mock.return_value.__enter__ = mock.MagicMock(
+                    side_effect=lambda *args, **kwargs: (0, 'output', {'Id': 'container-id'}))
                 kozmic.builds.tasks.restart_job(job.id)
-            finally:
-                _run_mock.stop()
-                set_status_patcher.stop()
         self.db.session.rollback()
 
         assert self.build.jobs.count() == 1

@@ -13,6 +13,7 @@ import logging
 import github3
 import sqlalchemy.dialects.mysql
 import flask
+from Crypto.PublicKey import RSA
 from flask.ext.login import UserMixin
 from flask.ext.principal import Identity, RoleNeed, UserNeed
 from flask.ext.mail import Message
@@ -207,17 +208,23 @@ class User(HasRepositories, db.Model, UserMixin):
 
         github_data = collections.defaultdict(lambda: False)
 
-        for gh_team in self.gh.iter_user_teams():
-            for gh_repo in gh_team.iter_repos():
-                github_data[gh_repo.id] |= gh_team.permission in ('admin', 'push')
+        try:
+            for gh_team in self.gh.iter_user_teams():
+                for gh_repo in gh_team.iter_repos():
+                    github_data[gh_repo.id] |= gh_team.permission in ('admin', 'push')
 
-        for gh_repo in self.gh.iter_repos(type='all'):
-            # iter_repos lists only repositories owned by users, not ogranizations.
-            # Type "all" means both repositories owned by the logged in user and
-            # repositories owned by another users in which the logged in user
-            # is a collaborator.
-            # Collaborator of a user repository always have push rights:
-            github_data[gh_repo.id] = True
+            for gh_repo in self.gh.iter_repos(type='all'):
+                # iter_repos lists only repositories owned by users, not ogranizations.
+                # Type "all" means both repositories owned by the logged in user and
+                # repositories owned by another users in which the logged in user
+                # is a collaborator.
+                # Collaborator of a user repository always have push rights:
+                github_data[gh_repo.id] = True
+        except github3.GitHubError as e:
+            logger.warning(
+                'Failed to synchronize {user!r}\'s memberships with GitHub '
+                'due to {e!r}. Errors: {e.errors!r}'.format(user=self, e=e))
+            return False
 
         for gh_repo_id, can_manage in github_data.iteritems():
             project = Project.query.filter_by(gh_id=gh_repo_id).first()
@@ -228,6 +235,8 @@ class User(HasRepositories, db.Model, UserMixin):
                 user=self,
                 allows_management=can_manage)
             db.session.add(membership)
+
+        return True
 
 
 class Organization(HasRepositories, db.Model):
@@ -322,6 +331,31 @@ class Project(db.Model):
         """
         return self.owner.gh.repository(self.gh_login, self.gh_name)
 
+    def _generate_deploy_key(self, key_size, passphrase):
+        rsa_key = RSA.generate(key_size)
+        self.rsa_private_key = rsa_key.exportKey(
+            format='PEM', passphrase=passphrase)
+        self.rsa_public_key = rsa_key.publickey().exportKey(format='OpenSSH')
+
+    def ensure_deploy_key(self, key_size=2048, passphrase=None):
+        gh_key = self.gh.key(self.gh_key_id)
+        if gh_key:
+            return True
+
+        self._generate_deploy_key(
+            key_size, passphrase=passphrase or self.passphrase)
+
+        try:
+            gh_key = project.gh.create_key('Kozmic CI key', project.rsa_public_key)
+        except github3.GitHubError as e:
+            logger.warning(
+                'GitHub API call to add {project!r}\'s deploy key has failed '
+                'due to {e!r}. Errors: {e.errors!r}'.format(project=self, e=e))
+            return False
+        else:
+            project.gh_key_id = gh_key.id
+            return True
+
     def delete_deploy_key(self):
         gh_key = self.gh.key(self.gh_key_id)
         if not gh_key:
@@ -329,12 +363,11 @@ class Project(db.Model):
 
         try:
             gh_key.delete()
-        except github3.GitHubError as exc:
+        except github3.GitHubError as e:
             logger.warning(
                 'GitHub API call to delete {project}\'s key has failed. '
-                'The exception is "{exc!r} and it\'s errors are '
-                '{errors!r}.".'.format(project=self, exc=exc,
-                                       errors=exc.errors))
+                'The exception is "{e!r} and it\'s errors are '
+                '{e.errors!r}.".'.format(project=self, e=e))
             return False
         else:
             return True
@@ -375,27 +408,33 @@ class Project(db.Model):
 
         github_data = collections.defaultdict(lambda: False)
 
-        if self.gh.owner.type == 'Organization':
-            gh_teams = self.gh.iter_teams()
-            # The Owners team is not listed in /repos/:org/:repo/teams and
-            # it is "expected behaviour currently", but it's members
-            # definitely have admin access to the repository.
-            # The workaround is to find the Owners team "manually" by
-            # iterating through all the organization teams.
-            for gh_team in self.owner.gh.organization(self.gh.owner.login).iter_teams():
-                # Note: owners team can not be renamed, so it's completely
-                # OK to search for it by name
-                if gh_team.name == 'Owners':
-                    gh_teams = itertools.chain([gh_team], gh_teams)
+        try:
+            if self.gh.owner.type == 'Organization':
+                gh_teams = self.gh.iter_teams()
+                # The Owners team is not listed in /repos/:org/:repo/teams and
+                # it is "expected behaviour currently", but it's members
+                # definitely have admin access to the repository.
+                # The workaround is to find the Owners team "manually" by
+                # iterating through all the organization teams.
+                for gh_team in self.owner.gh.organization(self.gh.owner.login).iter_teams():
+                    # Note: owners team can not be renamed, so it's completely
+                    # OK to search for it by name
+                    if gh_team.name == 'Owners':
+                        gh_teams = itertools.chain([gh_team], gh_teams)
 
-            for gh_team in gh_teams:
-                for gh_user in gh_team.iter_members():
-                    github_data[gh_user.id] |= gh_team.permission in ('admin', 'push')
+                for gh_team in gh_teams:
+                    for gh_user in gh_team.iter_members():
+                        github_data[gh_user.id] |= gh_team.permission in ('admin', 'push')
 
-        elif self.gh.owner.type == 'User':
-            for gh_user in self.gh.iter_collaborators():
-                # Collaborator of a user repository always have push right
-                github_data[gh_user.id] = True
+            elif self.gh.owner.type == 'User':
+                for gh_user in self.gh.iter_collaborators():
+                    # Collaborator of a user repository always have push right
+                    github_data[gh_user.id] = True
+        except github3.GitHubError as e:
+            logger.warning(
+                'Failed to synchronize {project!r}\'s memberships with GitHub '
+                'due to {e!r}. Errors: {e.errors!r}'.format(project=self, e=e))
+            return False
 
         for gh_user_id, can_manage in github_data.iteritems():
             user = User.query.filter_by(gh_id=gh_user_id).first()
@@ -406,6 +445,8 @@ class Project(db.Model):
                 user=user,
                 allows_management=can_manage)
             db.session.add(membership)
+
+        return True
 
 
 class Hook(db.Model):

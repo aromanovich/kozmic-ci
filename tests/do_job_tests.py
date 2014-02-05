@@ -9,7 +9,7 @@ import docker
 from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
-from kozmic.models import db, Build, Job, TrackedFile
+from kozmic.models import db, Project, Build, Job, TrackedFile
 from . import TestCase, factories, utils
 
 
@@ -48,12 +48,11 @@ class TestDoJob(TestCase):
             shutil.rmtree(working_dir)
 
         with SessionScope(self.db):
-            with mock.patch.object(Build, 'set_status') as set_status_mock:
-                with mock.patch.object(Job, 'get_cache_id',
-                                       return_value='qwerty') as get_cache_id_mock:
-                    with mock.patch('kozmic.builds.tasks.create_temp_dir',
-                                    create_temp_dir):
-                        kozmic.builds.tasks.do_job(hook_call_id=hook_call.id)
+            with mock.patch.object(Build, 'set_status'), \
+                 mock.patch.object(Project, 'ensure_deploy_key'), \
+                 mock.patch.object(Job, 'get_cache_id', return_value='qwerty'), \
+                 mock.patch('kozmic.builds.tasks.create_temp_dir', create_temp_dir):
+                kozmic.builds.tasks.do_job(hook_call_id=hook_call.id)
         self.db.session.rollback()
 
         return Job.query.filter_by(hook_call=hook_call).first()
