@@ -8,7 +8,7 @@ from flask.ext.login import current_user
 from . import bp
 from .forms import HookForm, MemberForm
 from kozmic import db, perms
-from kozmic.models import Project, User, Membership, Hook, Build, Job
+from kozmic.models import MISSING_ID, Project, User, Membership, Hook, Build, Job
 
 
 logger = logging.getLogger(__name__)
@@ -153,6 +153,23 @@ def settings(id):
         fqdn=current_app.config['SERVER_NAME'])
 
 
+@bp.route('/<int:project_id>/hooks/ensure/', methods=('POST',))
+def ensure_hooks(project_id):
+    project = get_project(project_id, for_management=True)
+
+    ok_to_commit = True
+    for hook in project.hooks:
+        ok_to_commit &= hook.ensure()
+    if ok_to_commit:
+        db.session.commit()
+    else:
+        db.session.rollback()
+        flash('Something went wrong (probably there was a problem '
+              'communicating with the GitHub API). Please try again later.',
+              'warning')
+    return redirect(url_for('.settings', id=project_id))
+
+
 @bp.route('/<int:project_id>/hooks/add/', methods=('GET', 'POST'))
 def add_hook(project_id):
     project = get_project(project_id, for_management=True)
@@ -163,33 +180,17 @@ def add_hook(project_id):
         form.populate_obj(hook)
         db.session.add(hook)
 
-        hook.gh_id = -1  # Just some integer to avoid integrity error
+        hook.gh_id = MISSING_ID  # Just some integer to avoid integrity error
         db.session.flush()  # Flush SQL to get `hook.id`
 
-        try:
-            gh_hook = project.gh.create_hook(
-                name='web',
-                config={
-                    'url': url_for('builds.hook', id=hook.id, _external=True),
-                    'content_type': 'json',
-                },
-                events=['push', 'pull_request'],
-                active=True)
-        except github3.GitHubError as exc:
-            logger.warning(
-                'GitHub API call to create {project!r}\'s hook has failed. '
-                'The current user is {user!r}. The exception was '
-                '"{exc!r} and with errors {errors!r}.".'.format(
-                    project=project,
-                    user=current_user,
-                    exc=exc,
-                    errors=exc.errors))
+        ok_to_commit = hook.ensure()
+
+        if ok_to_commit:
+            db.session.commit()
+        else:
             db.session.rollback()
             flash('Sorry, failed to create a hook. Please try again later.',
                   'warning')
-        else:
-            hook.gh_id = gh_hook.id
-            db.session.commit()
         return redirect(url_for('.settings', id=project_id))
     else:
         return render_template(
@@ -232,14 +233,13 @@ def delete_hook(project_id, hook_id):
 def sync_memberships(id):
     project = get_project(id, for_management=True)
 
-    try:
-        project.sync_memberships_with_github()
-    except github3.GitHubError as exc:
+    ok_to_commit = project.sync_memberships_with_github()
+    if ok_to_commit:
+        db.session.commit()
+    else:
         db.session.rollback()
         flash('Something went wrong (probably there was a problem '
               'communicating with the GitHub API). Please try again later.',
               'warning')
-    else:
-        db.session.commit()
 
     return redirect(url_for('.settings', id=id))

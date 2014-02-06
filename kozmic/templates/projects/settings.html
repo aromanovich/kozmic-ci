@@ -35,7 +35,18 @@
           {% endif %}
         </div>
       {% endfor %}
-    </div> 
+    </div>
+
+    {% if is_current_user_a_manager %}
+      <form action="{{ url_for('.ensure_hooks', project_id=project.id) }}"
+            method="POST" id="ensure-hooks">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <small>If you have manually deleted (or corrupted) some of the hooks on GitHub, you can</small>
+        <button type="submit" class="btn btn-sm btn-default">
+          restore their configuration
+        </button>.
+      </form>
+    {% endif %}
   {% else %}
     <p>Hooks haven't been configured yet.</p>
   {% endif %}

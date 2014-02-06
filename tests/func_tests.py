@@ -279,13 +279,10 @@ class TestHooksManagement(TestCase):
         for field, value in hook_data.items():
             hook_form[field] = value
 
-        # Mock GitHub API call and submit the form
-        gh_repo_mock = mock.Mock()
-        gh_repo_mock.create_hook = mock.Mock(
-            return_value=github3.repos.hook.Hook(fixtures.HOOK_DATA))
+        with mock.patch.object(Hook, 'ensure', return_value=True) as ensure_mock:
+            r = hook_form.submit().follow()
 
-        with mock.patch.object(Project, 'gh', gh_repo_mock):
-            r = hook_form.submit()
+        ensure_mock.assert_called_once_with()
 
         # Ensure that hook has been created with the right data
         assert self.project.hooks.count() == 1
@@ -295,24 +292,11 @@ class TestHooksManagement(TestCase):
         assert hook.build_script == '#!/bin/bash\n./kozmic.sh'
         assert hook.docker_image == hook_data['docker_image']
 
-        # And GitHub API has been called with the right arguments
-        assert gh_repo_mock.create_hook.call_count == 1
-        args, kwargs = gh_repo_mock.create_hook.call_args
-        assert kwargs == {
-            'active': True,
-            'config': {
-                'url': url_for('builds.hook', id=hook.id, _external=True),
-                'content_type': 'json',
-            },
-            'events': ['push', 'pull_request'],
-            'name': 'web',
-        }
-
-        # Mock GitHub API call to raise an exception and submit the form again
-        gh_repo_mock = mock.Mock()
-        gh_repo_mock.create_hook.side_effect = self._github_error_side_effect
-        with mock.patch.object(Project, 'gh', gh_repo_mock):
+        # Pretend that there was a GitHub error
+        with mock.patch.object(Hook, 'ensure', return_value=False) as ensure_mock:
             r = hook_form.submit()
+
+        ensure_mock.assert_called_once_with()
 
         # Make sure that user gets the warning
         assert r.flashes == [

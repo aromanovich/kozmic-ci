@@ -20,14 +20,14 @@ def settings():
 
 @bp.route('/memberships/sync/', methods=('POST',))
 def sync_memberships():
-    try:
-        current_user.sync_memberships_with_github()
-    except github3.GitHubError as exc:
+    ok_to_commit = current_user.sync_memberships_with_github()
+
+    if ok_to_commit:
+        db.session.commit()
+    else:
         db.session.rollback()
         flash('Something went wrong (probably there was a problem '
               'communicating with the GitHub API). Please try again later.',
               'warning')
-    else:
-        db.session.commit()
 
     return redirect(request.referrer or url_for('projects.index'))

@@ -134,7 +134,7 @@ HOOK_DATA = {
         u'url': u'http://127.0.0.1:10001/_hooks/hook/1/',
         u'content_type': u'json'
     },
-    u'events': [u'pull_request'],
+    u'events': [u'push', u'pull_request'],
     u'last_response': {
         u'status': u'unused',
         u'message': None,

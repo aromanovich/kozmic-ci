@@ -112,3 +112,7 @@ body {
   height: 65px;
   font-family: monospace;
 }
+
+form#ensure-hooks {
+  margin-bottom: 20px;
+}

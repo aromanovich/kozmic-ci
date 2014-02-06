@@ -13,7 +13,7 @@ import pytest
 import redis
 import mock
 import github3
-from flask import current_app
+from flask import current_app, url_for
 from flask.ext.principal import Need
 from flask.ext.webtest import SessionScope
 
@@ -290,21 +290,21 @@ class TestProjectDB(TestCase):
 
         assert not john_doe.memberships.first()  # Just in case :)
 
-
     @mock.patch.object(Project, 'gh')
     def test_delete_deploy_key(self, gh_mock):
         gh_mock.key.return_value = None
         assert self.project.delete_deploy_key()
         gh_mock.key.assert_called_once_with(self.project.gh_key_id)
-        gh_mock.reset()
+        gh_mock.reset_mock()
 
         gh_key = mock.MagicMock()
         gh_mock.key.return_value = gh_key
         assert self.project.delete_deploy_key()
         gh_key.delete.assert_called_once_with()
-        gh_mock.reset()
+        gh_mock.reset_mock()
 
-        def side_effect(): raise github3.GitHubError(mock.MagicMock())
+        def side_effect():
+            raise github3.GitHubError(mock.MagicMock())
         gh_key = mock.MagicMock()
         gh_key.delete.side_effect = side_effect
         gh_mock.key.return_value = gh_key
@@ -420,6 +420,75 @@ class TestBuildDB(TestCase):
 
 
 class TestHookDB(TestCase):
+    @mock.patch.object(Project, 'gh')
+    def test_ensure(self, gh_mock):
+        user = factories.UserFactory.create()
+        project = factories.ProjectFactory.create(owner=user)
+        hook = factories.HookFactory.create(project=project)
+        spec = {
+            'active': True,
+            'config': {
+                'url': url_for('builds.hook', id=hook.id, _external=True),
+                'content_type': 'json',
+            },
+            'events': ['push', 'pull_request'],
+            'name': 'web',
+        }
+        gh_hook = github3.repos.hook.Hook(dict(func_fixtures.HOOK_DATA, **spec))
+        gh_hook.edit = mock.Mock()
+
+        # 1. GitHub hook does not exist, `ensure` call creates it
+        # with expected configuration
+        gh_mock.reset_mock()
+        gh_mock.hook.return_value = None
+        gh_mock.create_hook.return_value = gh_hook
+
+        assert hook.ensure()
+
+        assert hook.gh_id == func_fixtures.HOOK_DATA['id']
+        assert gh_mock.create_hook.call_count == 1
+        args, kwargs = gh_mock.create_hook.call_args
+        assert kwargs == spec
+
+        # 2. GitHub hook exists and has the right configuration.
+        # `ensure` does nothing
+        gh_mock.reset_mock()
+        gh_mock.hook.return_value = gh_hook
+
+        assert hook.ensure()
+
+        gh_mock.hook.assert_called_once_with(hook.gh_id)
+        assert not gh_hook.edit.called
+        assert not gh_mock.create_hook.called
+
+        # 3. GitHub hook exists but has the wrong configuration.
+        # `ensure` edits it
+        gh_mock.reset_mock()
+        gh_hook = github3.repos.hook.Hook(
+            dict(dict(func_fixtures.HOOK_DATA, **spec), events=['push']))
+        gh_hook.edit = mock.Mock()
+        gh_mock.hook.return_value = gh_hook
+
+        assert hook.ensure()
+
+        assert gh_mock.hook.return_value.edit.call_count == 1
+        args, kwargs = gh_mock.hook.return_value.edit.call_args
+        assert kwargs == {
+            'config': spec['config'],
+            'events': spec['events'],
+        }
+        gh_mock.hook.assert_called_once_with(hook.gh_id)
+        assert not gh_mock.create_hook.called
+
+        # 4. GitHub error happens
+        gh_mock.reset_mock()
+        def _github_error_side_effect(*args, **kwargs):
+            raise github3.GitHubError(mock.Mock())
+        gh_mock.create_hook.side_effect = _github_error_side_effect
+        gh_mock.hook.return_value = None
+
+        assert not hook.ensure()
+
     def test_delete_cascade(self):
         """Tests that hook calls are preserved on hook delete."""
         user = factories.UserFactory.create()
@@ -654,18 +723,6 @@ class TestBuildTaskDB(TestCase):
         job_id_before_restart = job.id
 
         with SessionScope(self.db):
-#            set_status_patcher = mock.patch.object(Build, 'set_status')
-            #_run_patcher = mock.patch('kozmic.builds.tasks._run')
-
-            #set_status_mock = set_status_patcher.start()
-            #_run_mock = _run_patcher.start()
-            #_run_mock.return_value.__enter__ = mock.MagicMock(
-                #side_effect=lambda *args, **kwargs: (0, 'output', {'Id': 'container-id'}))
-            #try:
-                #kozmic.builds.tasks.restart_job(job.id)
-            #finally:
-                #_run_mock.stop()
-                #set_status_patcher.stop()
             with mock.patch.object(Build, 'set_status') as set_status_mock, \
                  mock.patch('kozmic.builds.tasks._run') as _run_mock, \
                  mock.patch.object(Project, 'ensure_deploy_key') as ensure_deploy_key_mock:

@@ -37,6 +37,9 @@ github3.repos.Repository.iter_collaborators = iter_collaborators
 logger = logging.getLogger(__name__)
 
 
+MISSING_ID = -1
+
+
 class RepositoryBase(object):
     """A base repository class to be used by :class:`HasRepositories` mixin."""
     id = db.Column(db.Integer, primary_key=True)
@@ -201,7 +204,8 @@ class User(HasRepositories, db.Model, UserMixin):
 
     def sync_memberships_with_github(self):
         """Does the same as :meth:`Project.sync_memberships_with_github`,
-        but for the user.
+        but for the user. Returns True if there were not any GitHub errors;
+        False otherwise.
         """
         for membership in self.memberships:
             db.session.delete(membership)
@@ -338,7 +342,12 @@ class Project(db.Model):
         self.rsa_public_key = rsa_key.publickey().exportKey(format='OpenSSH')
 
     def ensure_deploy_key(self, key_size=2048, passphrase=None):
-        gh_key = self.gh.key(self.gh_key_id)
+        """If the project's GitHub deploy key does not exist, generates a key
+        pair and uploads the public key to GitHub.
+        Returns True if there weren't GitHub API errors; False otherwise.
+        """
+        gh_key = (self.gh.key(self.gh_key_id)
+                  if self.gh_key_id != MISSING_ID else None)
         if gh_key:
             return True
 
@@ -357,6 +366,9 @@ class Project(db.Model):
             return True
 
     def delete_deploy_key(self):
+        """Deletes the deploy key from GitHub. Returns True if it has been
+        successfully deleted (or was missing); False otherwise.
+        """
         gh_key = self.gh.key(self.gh_key_id)
         if not gh_key:
             return True
@@ -402,6 +414,8 @@ class Project(db.Model):
         GitHub _repository members_ with admin and push rights become
         :term:`project managers`, other _repository members_ become
         :term:`project members`.
+
+        Returns True if there were not any GitHub errors; False otherwise.
         """
         for membership in self.memberships:
             db.session.delete(membership)
@@ -470,6 +484,36 @@ class Hook(db.Model):
     #: Project
     project = db.relationship(
         Project, backref=db.backref('hooks', lazy='dynamic', cascade='all'))
+
+    def ensure(self):
+        """If the corresponding GitHub hook does not exist, creates it.
+        If it exists, but has wrong configuration, re-configures it.
+        Returns True if there weren't GitHub API errors; False otherwise.
+        """
+        events = ['push', 'pull_request']
+        config = {
+            'url': flask.url_for('builds.hook', id=self.id, _external=True),
+            'content_type': 'json',
+        }
+
+        try:
+            gh_hook = (self.project.gh.hook(self.gh_id)
+                       if self.gh_id != MISSING_ID else None)
+            if gh_hook:
+                if gh_hook.events != events or gh_hook.config != config:
+                    gh_hook.edit(config=config, events=events)
+            else:
+                gh_hook = self.project.gh.create_hook(
+                    name='web', config=config, events=events, active=True)
+        except github3.GitHubError as e:
+            logger.warning(
+                'GitHub API call to create {project!r}\'s hook has failed. '
+                'The exception is "{e!r} and with errors {e.errors!r}.".'.format(
+                    project=self.project, e=e))
+            return False
+        else:
+            self.gh_id = gh_hook.id
+            return True
 
     def delete(self):
         """Deletes the project hook. Returns True if it's corresponding GitHub
