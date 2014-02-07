@@ -460,7 +460,7 @@ def do_job(hook_call_id):
         redis_client=redis_client,
         channel=job.task_uuid,
         stall_timeout=config['KOZMIC_STALL_TIMEOUT'],
-        rsa_private_key=project.rsa_private_key,
+        rsa_private_key=project.deploy_key.rsa_private_key,
         passphrase=project.passphrase,
         clone_url=project.gh_clone_url,
         commit_sha=hook_call.build.gh_commit_sha)
@@ -480,7 +480,8 @@ def do_job(hook_call_id):
     else:
         logger.info('%s image has been pulled.', hook.docker_image)
 
-    project.ensure_deploy_key()
+    if not project.is_public:
+        project.deploy_key.ensure()
 
     install_stdout = ''
     if job.hook_call.hook.install_script:

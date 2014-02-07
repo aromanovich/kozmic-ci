@@ -6,7 +6,7 @@ from flask import current_app, flash, request, render_template, redirect, url_fo
 from flask.ext.login import current_user
 
 from kozmic import db
-from kozmic.models import MISSING_ID, User, Organization, Project
+from kozmic.models import User, Organization, Project, DeployKey
 from . import bp
 
 
@@ -112,12 +112,13 @@ def on(gh_id):
         gh_full_name=repo.gh_full_name,
         gh_login=repo.parent.gh_login,
         gh_clone_url=repo.gh_clone_url,
-        gh_key_id=MISSING_ID)
+        is_public=repo.is_public)
     db.session.add(project)
 
-    ok_to_commit = project.ensure_deploy_key()
-    db.session.flush()
-
+    ok_to_commit = True
+    if not project.is_public:
+        project.deploy_key = DeployKey(passphrase=project.passphrase)
+        ok_to_commit = ok_to_commit and project.deploy_key.ensure()
     ok_to_commit = ok_to_commit and project.sync_memberships_with_github()
 
     if ok_to_commit:

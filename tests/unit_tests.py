@@ -20,8 +20,8 @@ from flask.ext.webtest import SessionScope
 import kozmic.builds.tasks
 import kozmic.builds.views
 from kozmic import mail, docker
-from kozmic.models import (db, Membership, User, Project, Hook, HookCall, Job,
-                           Build, TrackedFile)
+from kozmic.models import (db, DeployKey, Project, Membership, User, Hook,
+                           HookCall, Job, Build, TrackedFile)
 from . import TestCase, factories, func_fixtures, utils, unit_fixtures as fixtures
 
 
@@ -76,6 +76,8 @@ class TestUser(unittest.TestCase, TestUserUtils):
             sorted(gh_orgs, key=lambda gh_org: gh_org.login)
         assert len(gh_repos_by_org_id[pyconru_org.id]) == 1
         assert len(gh_repos_by_org_id[unistorage_org.id]) == 6
+        assert len([repo for repo in gh_repos_by_org_id[unistorage_org.id]
+                    if repo.private]) == 2
 
     def test_get_gh_repos(self):
         stub = self.get_stub_for__get_gh_repos()
@@ -293,13 +295,13 @@ class TestProjectDB(TestCase):
     @mock.patch.object(Project, 'gh')
     def test_delete_deploy_key(self, gh_mock):
         gh_mock.key.return_value = None
-        assert self.project.delete_deploy_key()
-        gh_mock.key.assert_called_once_with(self.project.gh_key_id)
+        assert self.project.deploy_key.delete()
+        gh_mock.key.assert_called_once_with(self.project.deploy_key.gh_id)
         gh_mock.reset_mock()
 
         gh_key = mock.MagicMock()
         gh_mock.key.return_value = gh_key
-        assert self.project.delete_deploy_key()
+        assert self.project.deploy_key.delete()
         gh_key.delete.assert_called_once_with()
         gh_mock.reset_mock()
 
@@ -308,14 +310,13 @@ class TestProjectDB(TestCase):
         gh_key = mock.MagicMock()
         gh_key.delete.side_effect = side_effect
         gh_mock.key.return_value = gh_key
-        assert not self.project.delete_deploy_key()
+        assert not self.project.deploy_key.delete()
 
     def test_delete(self):
         with mock.patch.object(Hook, 'delete') as hook_delete_mock:
-            with mock.patch.object(
-                    Project, 'delete_deploy_key') as delete_deploy_key_mock:
+            with mock.patch.object(DeployKey, 'delete') as deploy_key_delete_mock:
                 self.project.delete()
-        delete_deploy_key_mock.assert_called_once_with()
+        deploy_key_delete_mock.assert_called_once_with()
         hook_delete_mock.assert_called_once_with()
         self.db.session.commit()
 
@@ -687,7 +688,7 @@ class TestBuildTaskDB(TestCase):
     def test_do_job(self):
         with SessionScope(self.db):
             with mock.patch.object(Build, 'set_status') as set_status_mock, \
-                 mock.patch.object(Project, 'ensure_deploy_key') as ensure_deploy_key_mock, \
+                 mock.patch.object(DeployKey, 'ensure') as ensure_deploy_key_mock, \
                  mock.patch('kozmic.builds.tasks.Builder', new=BuilderStub), \
                  mock.patch('kozmic.builds.tasks.Tailer'), \
                  mock.patch.multiple('docker.Client', pull=mock.DEFAULT,
@@ -725,7 +726,7 @@ class TestBuildTaskDB(TestCase):
         with SessionScope(self.db):
             with mock.patch.object(Build, 'set_status') as set_status_mock, \
                  mock.patch('kozmic.builds.tasks._run') as _run_mock, \
-                 mock.patch.object(Project, 'ensure_deploy_key') as ensure_deploy_key_mock:
+                 mock.patch.object(DeployKey, 'ensure') as ensure_deploy_key_mock:
                 _run_mock.return_value.__enter__ = mock.MagicMock(
                     side_effect=lambda *args, **kwargs: (0, 'output', {'Id': 'container-id'}))
                 kozmic.builds.tasks.restart_job(job.id)

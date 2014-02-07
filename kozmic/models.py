@@ -52,6 +52,8 @@ class RepositoryBase(object):
     gh_full_name = db.Column(db.String(200), nullable=False)
     #: SSH clone url
     gh_clone_url = db.Column(db.String(200), nullable=False)
+    #: Is the repository public?
+    is_public = db.Column(db.Boolean, nullable=False)
 
     @classmethod
     def from_gh_repo(cls, gh_repo):
@@ -63,7 +65,8 @@ class RepositoryBase(object):
             gh_id=gh_repo.id,
             gh_name=gh_repo.name,
             gh_full_name=gh_repo.full_name,
-            gh_clone_url=gh_repo.ssh_url)  # Note: ssh_url, not clone_url
+            gh_clone_url=gh_repo.ssh_url,  # Note: ssh_url, not clone_url
+            is_public=not gh_repo.private)
 
 
 class HasRepositories(object):
@@ -207,6 +210,8 @@ class User(HasRepositories, db.Model, UserMixin):
         but for the user. Returns True if there were not any GitHub errors;
         False otherwise.
         """
+        assert self.id
+
         for membership in self.memberships:
             db.session.delete(membership)
 
@@ -285,6 +290,68 @@ class Membership(db.Model):
         return u'<Membership {0!r} {1!r}>'.format(self.user, self.project)
 
 
+class DeployKey(db.Model):
+    """An RSA deploy key pair."""
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'),
+                           nullable=False)
+
+    #: GitHub deploy key id
+    gh_id = db.Column(db.Integer, nullable=False, default=MISSING_ID)
+    #: RSA private deploy key in PEM format encrypted with the app secret key
+    rsa_private_key = db.Column(db.Text, nullable=False)
+    #: RSA public deploy key in OpenSSH format
+    rsa_public_key = db.Column(db.Text, nullable=False)
+
+    def __init__(self, passphrase, key_size=2048):
+        rsa_key = RSA.generate(key_size)
+        self.rsa_private_key = rsa_key.exportKey(format='PEM', passphrase=passphrase)
+        self.rsa_public_key = rsa_key.publickey().exportKey(format='OpenSSH')
+
+    def ensure(self):
+        """If the corresponding GitHub deploy key does not exist, creates it.
+        Returns True if there weren't GitHub API errors; False otherwise.
+        """
+        gh_key = (self.project.gh.key(self.gh_id)
+                  if self.gh_id != MISSING_ID else None)
+        if gh_key:
+            return True
+
+        try:
+            gh_key = self.project.gh.create_key(
+                'Kozmic CI key', self.project.rsa_public_key)
+            self.gh_id = gh_key.id
+        except github3.GitHubError as e:
+            logger.warning(
+                'GitHub API call to add {project!r}\'s deploy key has failed '
+                'due to {e!r}. Errors: {e.errors!r}'.format(
+                    project=self.project, e=e))
+            return False
+        else:
+            return True
+
+    def delete(self):
+        """Deletes the public key from GitHub. Returns True if it has been
+        successfully deleted (or was missing); False otherwise.
+        """
+        db.session.delete(self)
+
+        gh_key = self.project.gh.key(self.gh_id)
+        if not gh_key:
+            return True
+
+        try:
+            gh_key.delete()
+        except github3.GitHubError as e:
+            logger.warning(
+                'GitHub API call to delete {project}\'s key has failed. '
+                'The exception is "{e!r} and it\'s errors are '
+                '{e.errors!r}.".'.format(project=self.project, e=e))
+            return False
+        else:
+            return True
+
+
 class Project(db.Model):
     """Project is a GitHub repository that is being watched by
     Kozmic CI.
@@ -302,14 +369,13 @@ class Project(db.Model):
     gh_login = db.Column(db.String(200), nullable=False)
     #: SSH repo clone url
     gh_clone_url = db.Column(db.String(200), nullable=False)
+    #: Is the project's repository public?
+    is_public = db.Column(db.Boolean, nullable=False)
 
-    #: GitHub deploy key id
-    gh_key_id = db.Column(db.Integer, nullable=False)
-    #: RSA private deploy key in PEM format encrypted with the app secret key
-    rsa_private_key = db.Column(db.Text, nullable=False)
-    #: RSA public deploy key in OpenSSH format
-    rsa_public_key = db.Column(db.Text, nullable=False)
-
+    #: Deploy key
+    deploy_key = db.relationship(
+        'DeployKey', cascade='all', uselist=False,
+        backref=db.backref('project'))
     #: Project members
     members = db.relationship(
         'User', secondary='project_members', lazy='dynamic', viewonly=True,
@@ -335,55 +401,6 @@ class Project(db.Model):
         """
         return self.owner.gh.repository(self.gh_login, self.gh_name)
 
-    def _generate_deploy_key(self, key_size, passphrase):
-        rsa_key = RSA.generate(key_size)
-        self.rsa_private_key = rsa_key.exportKey(
-            format='PEM', passphrase=passphrase)
-        self.rsa_public_key = rsa_key.publickey().exportKey(format='OpenSSH')
-
-    def ensure_deploy_key(self, key_size=2048, passphrase=None):
-        """If the project's GitHub deploy key does not exist, generates a key
-        pair and uploads the public key to GitHub.
-        Returns True if there weren't GitHub API errors; False otherwise.
-        """
-        gh_key = (self.gh.key(self.gh_key_id)
-                  if self.gh_key_id != MISSING_ID else None)
-        if gh_key:
-            return True
-
-        self._generate_deploy_key(
-            key_size, passphrase=passphrase or self.passphrase)
-
-        try:
-            gh_key = project.gh.create_key('Kozmic CI key', project.rsa_public_key)
-        except github3.GitHubError as e:
-            logger.warning(
-                'GitHub API call to add {project!r}\'s deploy key has failed '
-                'due to {e!r}. Errors: {e.errors!r}'.format(project=self, e=e))
-            return False
-        else:
-            project.gh_key_id = gh_key.id
-            return True
-
-    def delete_deploy_key(self):
-        """Deletes the deploy key from GitHub. Returns True if it has been
-        successfully deleted (or was missing); False otherwise.
-        """
-        gh_key = self.gh.key(self.gh_key_id)
-        if not gh_key:
-            return True
-
-        try:
-            gh_key.delete()
-        except github3.GitHubError as e:
-            logger.warning(
-                'GitHub API call to delete {project}\'s key has failed. '
-                'The exception is "{e!r} and it\'s errors are '
-                '{e.errors!r}.".'.format(project=self, e=e))
-            return False
-        else:
-            return True
-
     def delete(self):
         """Deletes the project and it's corresponding GitHub entities such as
         hooks, deploy key, etc. Returns True if they all have been
@@ -392,7 +409,7 @@ class Project(db.Model):
         db.session.delete(self)
 
         rv = True
-        rv &= self.delete_deploy_key()
+        rv &= self.deploy_key.delete()
         for hook in self.hooks:
             rv &= hook.delete()
             if not rv:
@@ -470,7 +487,7 @@ class Hook(db.Model):
                            nullable=False)
 
     #: GitHub hook id
-    gh_id = db.Column(db.Integer, nullable=False)
+    gh_id = db.Column(db.Integer, nullable=False, default=MISSING_ID)
     #: Title
     title = db.Column(db.String(200), nullable=False)
     #: Install script
@@ -490,6 +507,8 @@ class Hook(db.Model):
         If it exists, but has wrong configuration, re-configures it.
         Returns True if there weren't GitHub API errors; False otherwise.
         """
+        assert self.id
+
         events = ['push', 'pull_request']
         config = {
             'url': flask.url_for('builds.hook', id=self.id, _external=True),

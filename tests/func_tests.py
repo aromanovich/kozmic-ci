@@ -10,8 +10,8 @@ import github3.git
 from flask import url_for
 
 import kozmic.builds.tasks
-from kozmic.models import (User, Project, Membership, Hook, HookCall,
-                           Build, Job, TrackedFile)
+from kozmic.models import (User, DeployKey, Project, Membership, Hook,
+                           HookCall, Build, Job, TrackedFile)
 from . import TestCase, func_fixtures as fixtures
 from . import factories, unit_tests
 
@@ -90,10 +90,11 @@ class TestProjects(TestCase):
 
         self.user_1_project = factories.ProjectFactory.create(owner=self.user_1)
 
-        self.user_2_repo = factories.UserRepositoryFactory.create(parent=self.user_2)
+        self.user_2_repo = factories.UserRepositoryFactory.create(
+            parent=self.user_2, is_public=True)
         self.user_2_org = factories.OrganizationFactory.create(user=self.user_2)
-        self.user_2_org_repo = \
-            factories.OrganizationRepositoryFactory.create(parent=self.user_2_org)
+        self.user_2_org_repo = factories.OrganizationRepositoryFactory.create(
+            parent=self.user_2_org)
 
     def test_projects_sync(self):
         """User can sync projects with GitHub."""
@@ -126,6 +127,7 @@ class TestProjects(TestCase):
             gh_login='unistorage').first().repositories
         assert pyconru_repos.count() == 1
         assert unistorage_repos.count() == 6
+        assert unistorage_repos.filter_by(is_public=True).count() == 4
         assert user.repos_last_synchronized_at
 
         # Make sure that all the repositories are listed
@@ -172,29 +174,40 @@ class TestProjects(TestCase):
 
         r = self.w.get('/').maybe_follow().click('Repositories')
 
-        def ensure_deploy_key(project):
-            project._generate_deploy_key(1024, 'passphrase')
-            project.gh_key_id = 1
-            return True
-
-        with mock.patch.object(Project, 'gh'), \
-             mock.patch.object(Project, 'sync_memberships_with_github') as sync_mock, \
-             mock.patch.object(Project, 'ensure_deploy_key', autospec=True,
-                               side_effect=ensure_deploy_key) as ensure_deploy_key_mock:
+        with mock.patch.object(Project, 'sync_memberships_with_github') as sync_mock, \
+             mock.patch.object(DeployKey, 'ensure') as ensure_deploy_key_mock:
                 form_id = 'create-project-{}'.format(self.user_2_org_repo.gh_id)
                 r.forms[form_id].submit().follow()
+        # The repository is private, make sure a deploy key was created
+        ensure_deploy_key_mock.assert_called_once_with()
         sync_mock.assert_called_once_with()
-        ensure_deploy_key_mock.assert_called_once_with(mock.ANY)
 
         assert self.user_2.owned_projects.count() == 1
-        project = self.user_2.owned_projects.first()
+        project = self.user_2.owned_projects.filter_by(
+            gh_id=self.user_2_org_repo.gh_id).first()
+        assert project.deploy_key
+        assert not project.is_public
         assert project.gh_id == self.user_2_org_repo.gh_id
         assert project.gh_name == self.user_2_org_repo.gh_name
         assert project.gh_full_name == self.user_2_org_repo.gh_full_name
         assert project.gh_login == self.user_2_org_repo.parent.gh_login
-        assert project.gh_key_id == 1
-        assert project.rsa_public_key.startswith('ssh-rsa ')
-        assert project.rsa_private_key.startswith('-----BEGIN RSA PRIVATE KEY-----')
+        assert project.deploy_key.rsa_public_key.startswith('ssh-rsa ')
+        assert project.deploy_key.rsa_private_key.startswith(
+            '-----BEGIN RSA PRIVATE KEY-----')
+
+        with mock.patch.object(Project, 'sync_memberships_with_github') as sync_mock, \
+             mock.patch.object(DeployKey, 'ensure') as ensure_deploy_key_mock:
+                form_id = 'create-project-{}'.format(self.user_2_repo.gh_id)
+                r.forms[form_id].submit().follow()
+        # The repository is public, make sure a deploy key wasn't created
+        assert not ensure_deploy_key_mock.called
+        sync_mock.assert_called_once_with()
+
+        assert self.user_2.owned_projects.count() == 2
+        project = self.user_2.owned_projects.filter_by(
+            gh_id=self.user_2_repo.gh_id).first()
+        assert not project.deploy_key
+        assert project.is_public
 
     def test_project_deletion(self):
         """User can delete an owned project."""
@@ -527,7 +540,7 @@ class TestGitHubHooks(TestCase):
              mock.patch('kozmic.builds.tasks.do_job') as do_job_mock:
             push_hook_call_data = copy.deepcopy(fixtures.PUSH_HOOK_CALL_DATA)
             push_hook_call_data['ref'] = 'refs/heads/{}'.format(
-            fixtures.PULL_REQUEST_HOOK_CALL_DATA['pull_request']['head']['ref'])
+                fixtures.PULL_REQUEST_HOOK_CALL_DATA['pull_request']['head']['ref'])
 
             for hook in (self.hook_1, self.hook_2):
                 self.w.post_json(

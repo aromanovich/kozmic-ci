@@ -9,7 +9,7 @@ import docker
 from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
-from kozmic.models import db, Project, Build, Job, TrackedFile
+from kozmic.models import db, Project, DeployKey, Build, Job, TrackedFile
 from . import TestCase, factories, utils
 
 
@@ -25,10 +25,7 @@ class TestDoJob(TestCase):
         self.user = factories.UserFactory.create()
         self.project = factories.ProjectFactory.create(
             owner=self.user,
-            rsa_private_key='',
             gh_clone_url='/kozmic/test-repo')  # NOTE
-        self.project.rsa_private_key = utils.generate_private_key(
-            self.project.passphrase)
         db.session.commit()
 
         self.hook = factories.HookFactory.create(
@@ -49,7 +46,7 @@ class TestDoJob(TestCase):
 
         with SessionScope(self.db):
             with mock.patch.object(Build, 'set_status'), \
-                 mock.patch.object(Project, 'ensure_deploy_key'), \
+                 mock.patch.object(DeployKey, 'ensure'), \
                  mock.patch.object(Job, 'get_cache_id', return_value='qwerty'), \
                  mock.patch('kozmic.builds.tasks.create_temp_dir', create_temp_dir):
                 kozmic.builds.tasks.do_job(hook_call_id=hook_call.id)

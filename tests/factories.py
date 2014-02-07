@@ -1,10 +1,12 @@
 import hashlib
 import datetime
 
+import mock
 import factory.alchemy
+from Crypto.PublicKey import RSA
 
-from kozmic.models import (db, User, Project, Membership, Hook, TrackedFile,
-                           HookCall, Build, Job, Organization)
+from kozmic.models import (db, User, DeployKey, Project, Membership, Hook,
+                           TrackedFile, HookCall, Build, Job, Organization)
 
 
 class Factory(factory.alchemy.SQLAlchemyModelFactory):
@@ -25,6 +27,7 @@ def setup(session):
 def reset():
     factories = (
         UserFactory,
+        DeployKeyFactory,
         ProjectFactory,
         MembershipFactory,
         UserRepositoryFactory,
@@ -61,6 +64,7 @@ class UserRepositoryFactory(Factory):
     gh_id = factory.Sequence(lambda n: 1000 + n)
     gh_name = 'django'
     gh_full_name = 'johndoe/django'
+    is_public = False
 
     @factory.lazy_attribute
     def gh_clone_url(self):
@@ -83,6 +87,7 @@ class OrganizationRepositoryFactory(Factory):
     gh_id = factory.Sequence(lambda n: 2000 + n)
     gh_name = 'django'
     gh_full_name = 'johndoe/django'
+    is_public = False
 
     @factory.lazy_attribute
     def gh_clone_url(self):
@@ -91,6 +96,13 @@ class OrganizationRepositoryFactory(Factory):
 
 class MembershipFactory(Factory):
     FACTORY_FOR = Membership
+
+
+class DeployKeyFactory(Factory):
+    FACTORY_FOR = DeployKey
+
+
+CACHED_RSA_KEY = RSA.generate(1024)
 
 
 class ProjectFactory(Factory):
@@ -102,9 +114,15 @@ class ProjectFactory(Factory):
     gh_full_name = factory.Sequence(u'project_{0}/project_{0}'.format)
     gh_login = factory.Sequence(u'project_{}'.format)
     gh_clone_url = factory.Sequence(u'git://example.com/%d.git'.format)
-    gh_key_id = factory.Sequence(_identity)
-    rsa_public_key = factory.Sequence(str)
-    rsa_private_key = factory.Sequence(lambda n: str(n) + '.pub')
+    is_public = False
+
+    @factory.post_generation
+    def generate_deploy_key(project, create, extracted, **kwargs):
+        if not project.is_public:
+            with mock.patch('Crypto.PublicKey.RSA.generate',
+                            return_value=CACHED_RSA_KEY):
+                project.deploy_key = DeployKey(passphrase=project.passphrase)
+            db.session.commit()
 
 
 class BuildFactory(Factory):

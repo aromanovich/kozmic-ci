@@ -179,10 +179,7 @@ def add_hook(project_id):
         hook = Hook(project=project)
         form.populate_obj(hook)
         db.session.add(hook)
-
-        hook.gh_id = MISSING_ID  # Just some integer to avoid integrity error
         db.session.flush()  # Flush SQL to get `hook.id`
-
         ok_to_commit = hook.ensure()
 
         if ok_to_commit:

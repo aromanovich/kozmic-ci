@@ -20,8 +20,9 @@ def auth_callback(response):
                  gh_avatar_url=gh_user.avatar_url,
                  email=gh_user.email))
     user.gh_access_token = access_token
-    user.sync_memberships_with_github()
     db.session.add(user)
+    db.session.flush()  # To get `user.id`
+    user.sync_memberships_with_github()
     db.session.commit()
     login_user(user, remember=True)
     return redirect(url_for('projects.index'))
