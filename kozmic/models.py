@@ -814,6 +814,12 @@ class Job(db.Model):
         return flask.current_app.config['TAILER_URL_TEMPLATE'].format(
             job_id=self.task_uuid)
 
+    @property
+    def permanent_url(self):
+        """A permanent URL of the job."""
+        return flask.url_for('.job', project_id=self.build.project.id,
+                             build_id=self.build.id, id=self.id)
+
     def is_finished(self):
         """Is the job finished?"""
         return self.status in ('success', 'failure', 'error')

@@ -99,8 +99,6 @@ def build(project_id, id):
         is_build_latest=(id == 'latest'),
         project=project,
         build=build,
-        permanent_job_url=url_for('.job', project_id=project.id,
-                                  build_id=build.id, id=job.id),
         job=job)
 
 

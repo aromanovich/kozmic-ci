@@ -18,10 +18,10 @@
 {% block extra_head %}
   {{ super() }}
   {{ render_ansi2html_style_tag()|safe }}
-  {% if permanent_job_url %}
-    {# Specify base href so that line number links (which are relative) points to
-    the permanent job URL. #}
-    <base href="{{ permanent_job_url }}">
+  {% if job %}
+    {# Specify base href so that line number links (which are relative)
+       will point to the permanent job URL. #}
+    <base href="{{ job.permanent_url }}">
   {% endif %}
 {% endblock %}
 
@@ -49,20 +49,24 @@
     </dd>
   </dl>
 
-  <div>
-    <ul class="nav nav-tabs">
-      {% for job_ in build.jobs %}
-        <li{% if job_.id == job.id %} class="active"{% endif %}>
-          <a href="{{ url_for('.job', project_id=project.id, build_id=build.id, id=job_.id) }}">
-            "{{ job_.hook_call.hook.title }}" job {{ render_status(job_.status, text='●', type='badge') }}
-          </a>
-        </li>
-      {% endfor %}
-    </ul>
-    
-    {% block job_content %}
-    {% endblock %}
-  </div>
+  {% if build.jobs.first() %}
+    <div>
+      <ul class="nav nav-tabs">
+        {% for job_ in build.jobs %}
+          <li{% if job_.id == job.id %} class="active"{% endif %}>
+            <a href="{{ url_for('.job', project_id=project.id, build_id=build.id, id=job_.id) }}">
+              "{{ job_.hook_call.hook.title }}" job {{ render_status(job_.status, text='●', type='badge') }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+
+      {% block job_content %}
+      {% endblock %}
+    </div>
+  {% else %}
+    <p>The build has been enqueued, but not started yet.</p>
+  {% endif %}
 
   {% if build.status == 'enqueued' %}
     <script>

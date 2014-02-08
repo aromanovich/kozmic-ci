@@ -29,10 +29,8 @@
   {% endif %}
   
   <pre class="job-log"
-      data-job-id="{{ job.id }}"
-      {% if job.status == 'pending' %}
-        data-tailer-url="{{ job.tailer_url }}"
-      {% endif %}>{#
+       data-job-id="{{ job.id }}"
+       {% if job.status == 'pending' %}data-tailer-url="{{ job.tailer_url }}"{% endif %}>{#
     #}{% if job.is_finished() -%}
       {{ job.stdout.decode('utf-8')|ansi2html|safe }}
     {%- endif %}{#
