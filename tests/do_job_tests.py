@@ -25,7 +25,8 @@ class TestDoJob(TestCase):
         self.user = factories.UserFactory.create()
         self.project = factories.ProjectFactory.create(
             owner=self.user,
-            gh_clone_url='/kozmic/test-repo')  # NOTE
+            gh_https_clone_url='/kozmic/test-repo',
+            gh_ssh_clone_url='/kozmic/test-repo')  # NOTE
 
         self.hook = factories.HookFactory.create(
             project=self.project,

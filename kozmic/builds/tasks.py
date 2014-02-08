@@ -465,7 +465,8 @@ def do_job(hook_call_id):
         redis_client=redis_client,
         channel=job.task_uuid,
         stall_timeout=config['KOZMIC_STALL_TIMEOUT'],
-        clone_url=project.gh_clone_url,
+        clone_url=(project.gh_https_clone_url if project.is_public else
+                   project.gh_ssh_clone_url),
         commit_sha=hook_call.build.gh_commit_sha)
 
     logger.info('Pulling %s image...', hook.docker_image)

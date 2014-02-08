@@ -67,8 +67,12 @@ class UserRepositoryFactory(Factory):
     is_public = False
 
     @factory.lazy_attribute
-    def gh_clone_url(self):
-        return 'git://github.com/{}.git'.format(self.gh_full_name)
+    def gh_ssh_clone_url(self):
+        return 'git@github.com:{}.git'.format(self.gh_full_name)
+
+    @factory.lazy_attribute
+    def gh_https_clone_url(self):
+        return 'https://github.com/{}.git'.format(self.gh_full_name)
 
 
 class OrganizationFactory(Factory):
@@ -90,8 +94,12 @@ class OrganizationRepositoryFactory(Factory):
     is_public = False
 
     @factory.lazy_attribute
-    def gh_clone_url(self):
-        return 'git://github.com/{}.git'.format(self.gh_full_name)
+    def gh_ssh_clone_url(self):
+        return 'git@github.com:{}.git'.format(self.gh_full_name)
+
+    @factory.lazy_attribute
+    def gh_https_clone_url(self):
+        return 'https://github.com/{}.git'.format(self.gh_full_name)
 
 
 class MembershipFactory(Factory):
@@ -113,7 +121,8 @@ class ProjectFactory(Factory):
     gh_name = factory.Sequence(u'project_{}'.format)
     gh_full_name = factory.Sequence(u'project_{0}/project_{0}'.format)
     gh_login = factory.Sequence(u'project_{}'.format)
-    gh_clone_url = factory.Sequence(u'git://example.com/%d.git'.format)
+    gh_ssh_clone_url = factory.Sequence(u'git@github.com:{}.git'.format)
+    gh_https_clone_url = factory.Sequence(u'https://github.com/{}.git'.format)
     is_public = False
 
     @factory.post_generation

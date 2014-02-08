@@ -111,7 +111,8 @@ def on(gh_id):
         gh_name=repo.gh_name,
         gh_full_name=repo.gh_full_name,
         gh_login=repo.parent.gh_login,
-        gh_clone_url=repo.gh_clone_url,
+        gh_ssh_clone_url=repo.gh_ssh_clone_url,
+        gh_https_clone_url=repo.gh_https_clone_url,
         is_public=repo.is_public)
     db.session.add(project)
 

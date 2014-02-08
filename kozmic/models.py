@@ -51,7 +51,9 @@ class RepositoryBase(object):
     #: GitHub full name (i.e., aromanovich/kozmic)
     gh_full_name = db.Column(db.String(200), nullable=False)
     #: SSH clone url
-    gh_clone_url = db.Column(db.String(200), nullable=False)
+    gh_ssh_clone_url = db.Column(db.String(200), nullable=False)
+    #: HTTPS clone url
+    gh_https_clone_url = db.Column(db.String(200), nullable=False)
     #: Is the repository public?
     is_public = db.Column(db.Boolean, nullable=False)
 
@@ -65,7 +67,8 @@ class RepositoryBase(object):
             gh_id=gh_repo.id,
             gh_name=gh_repo.name,
             gh_full_name=gh_repo.full_name,
-            gh_clone_url=gh_repo.ssh_url,  # Note: ssh_url, not clone_url
+            gh_ssh_clone_url=gh_repo.ssh_url,
+            gh_https_clone_url=gh_repo.clone_url,
             is_public=not gh_repo.private)
 
 
@@ -368,7 +371,9 @@ class Project(db.Model):
     #: GitHub repo owner (user or organization) login
     gh_login = db.Column(db.String(200), nullable=False)
     #: SSH repo clone url
-    gh_clone_url = db.Column(db.String(200), nullable=False)
+    gh_ssh_clone_url = db.Column(db.String(200), nullable=False)
+    #: HTTPS clone url
+    gh_https_clone_url = db.Column(db.String(200), nullable=False)
     #: Is the project's repository public?
     is_public = db.Column(db.Boolean, nullable=False)
 
