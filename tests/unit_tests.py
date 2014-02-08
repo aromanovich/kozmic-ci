@@ -542,8 +542,7 @@ class TestTailer(TestCase):
         with tempfile.NamedTemporaryFile(mode='a+b') as f:
             tailer = self._Tailer(
                 log_path=f.name,
-                redis_client=redis_client,
-                channel='test',
+                publisher=kozmic.builds.tasks.Publisher(redis_client, 'test'),
                 container=mock.MagicMock())
             tailer.start()
             time.sleep(.5)
@@ -560,18 +559,31 @@ class TestTailer(TestCase):
         time.sleep(.5)
         assert KOZMIC_BLUES + '\n' == ''.join(redis_client.lrange('test', 0, -1))
 
+    def test_kill_timeout_is_working(self):
+        with tempfile.NamedTemporaryFile(mode='a+b') as f:
+            tailer = self._Tailer(
+                log_path=f.name,
+                publisher=mock.MagicMock(),
+                container={'Id': '564fe66af3aa755d79797e1'},
+                kill_timeout=2)
+
+            with mock.patch.object(tailer, '_kill_container') as kill_container_mock:
+                tailer.start()
+                time.sleep(1)
+                assert not kill_container_mock.called
+                time.sleep(2)
+            kill_container_mock.assert_called_once_with()
+
+
+class TestPublisher(TestCase):
     def test_ansi_sequences_formatting(self):
-        colored_lines = [
+        redis_mock = mock.MagicMock()
+
+        publisher = kozmic.builds.tasks.Publisher(redis_mock, 'test')
+        publisher.publish([
             '[4mRunning "jshint:lib" (jshint) task[24m',
             '[36m->[0m running [36m1 suite',  # intentionally omit "[0m"
-        ]
-        redis_mock = mock.MagicMock()
-        tailer = self._Tailer(
-            log_path='some-file.txt',
-            redis_client=redis_mock,
-            channel='test',
-            container=mock.MagicMock())
-        tailer._publish(colored_lines)
+        ])
 
         expected_calls = [
             mock.call('test', '<span class="ansi4">Running "jshint:lib" '
@@ -581,27 +593,6 @@ class TestTailer(TestCase):
         ]
         assert redis_mock.rpush.call_args_list == expected_calls
         assert redis_mock.publish.call_args_list == expected_calls
-
-    def test_kill_timeout_is_working(self):
-        with tempfile.NamedTemporaryFile(mode='a+b') as f:
-            tailer = self._Tailer(
-                log_path=f.name,
-                redis_client=mock.MagicMock(),
-                channel='test',
-                container={'Id': '564fe66af3aa755d79797e1'},
-                kill_timeout=2)
-
-            with mock.patch.object(tailer, '_kill_container') as kill_container_mock:
-                with mock.patch.object(tailer, '_publish') as publish_mock:
-                    tailer.start()
-                    time.sleep(1)
-                    assert not kill_container_mock.called
-                    time.sleep(2)
-                    kill_container_mock.assert_called_once_with()
-
-            message = 'Sorry, your script has stalled and been killed.\n'
-            assert message in f.read()
-            publish_mock.assert_called_once_with([message])
 
 
 @pytest.mark.docker
@@ -689,16 +680,17 @@ class TestBuildTaskDB(TestCase):
             with mock.patch.object(Build, 'set_status') as set_status_mock, \
                  mock.patch.object(DeployKey, 'ensure') as ensure_deploy_key_mock, \
                  mock.patch('kozmic.builds.tasks.Builder', new=BuilderStub), \
-                 mock.patch('kozmic.builds.tasks.Tailer'), \
+                 mock.patch('kozmic.builds.tasks.Tailer') as tailer_mock, \
                  mock.patch.multiple('docker.Client', pull=mock.DEFAULT,
                                      inspect_image=mock.DEFAULT):
+                tailer_mock.return_value.has_killed_container = False
                 kozmic.builds.tasks.do_job(hook_call_id=self.hook_call.id)
         self.db.session.rollback()
 
         assert self.build.jobs.count() == 1
         job = self.build.jobs.first()
         assert job.return_code == 0
-        assert job.stdout == 'Everything went great!\nGood bye.'
+        assert 'Everything went great!\nGood bye.' in job.stdout
         build_number = self.build.number
         ensure_deploy_key_mock.assert_called_once_with()
         set_status_mock.assert_has_calls([
@@ -738,7 +730,7 @@ class TestBuildTaskDB(TestCase):
         job = self.build.jobs.first()
         assert job_id_before_restart != job.id
         assert job.return_code == 0
-        assert job.stdout == 'output'
+        assert 'output' in job.stdout
 
 
 class TestJobDB(TestCase):

@@ -41,6 +41,34 @@ def create_temp_dir():
     shutil.rmtree(build_dir)
 
 
+class Publisher(object):
+    """
+    :param redis_client: Redis client
+    :type log_path: redis.Redis
+
+    :param channel: pub/sub channel name
+    :type channel: str
+    """
+
+    def __init__(self, redis_client, channel):
+        self._redis_client = redis_client
+        self._channel = channel
+        self._ansi_converter = get_ansi_to_html_converter()
+
+    def publish(self, lines):
+        if isinstance(lines, basestring):
+            lines = [lines]
+        for line in lines:
+            line = self._ansi_converter.convert(line, full=False) + '\n'
+            self._redis_client.publish(self._channel, line)
+            self._redis_client.rpush(self._channel, line)
+
+    def finish(self):
+        # Remove `channel` key to let `tailer` module
+        # stop listening pubsub channel
+        self._redis_client.delete(self._channel)
+
+
 class Tailer(threading.Thread):
     """A daemon thread that waits for additional lines to be appended to a
     specified log file.
@@ -54,14 +82,15 @@ class Tailer(threading.Thread):
     specified Docker container will be killed and corresponding message
     will be appended to the log file.
 
+    Once the thread has finished, :attr:`has_killed_container` tells
+    whether the :param:`container` has stopped by itself or been killed
+    by a timeout.
+
     :param log_path: path to the log file to watch
     :type log_path: str
 
-    :param redis_client: Redis client
-    :type log_path: redis.Redis
-
-    :param channel: pub/sub channel name
-    :type channel: str
+    :param publisher: publisher
+    :type publisher: :class:`Publisher`
 
     :param container: container to kill
     :type сontainer: dictionary returned by :meth:`docker.Client.create_container`
@@ -72,16 +101,15 @@ class Tailer(threading.Thread):
     """
     daemon = True
 
-    def __init__(self, log_path, redis_client, channel, container, kill_timeout=600):
+    def __init__(self, log_path, publisher, container, kill_timeout=600):
         threading.Thread.__init__(self)
         self._stop = threading.Event()
         self._log_path = log_path
-        self._redis_client = redis_client
-        self._channel = channel
+        self._publisher = publisher
         self._container = container
         self._kill_timeout = kill_timeout
-        self._ansi_converter = get_ansi_to_html_converter()
         self._read_timeout = 0.5
+        self.has_killed_container = False
 
     def stop(self):
         self._stop.set()
@@ -89,31 +117,22 @@ class Tailer(threading.Thread):
     def is_stopped(self):
         return self._stop.isSet()
 
-    def _publish(self, lines):
-        for line in lines:
-            line = self._ansi_converter.convert(line, full=False) + '\n'
-            self._redis_client.publish(self._channel, line)
-            self._backlog(line)
-
-    def _backlog(self, line):
-        self._redis_client.rpush(self._channel, line)
 
     def _kill_container(self):
         logger.info('Tailer is killing %s', self._container)
         docker.kill(self._container)
+        self.has_killed_container = True
         logger.info('%s has been killed.', self._container)
 
     def run(self):
-        logger.info(
-            'Tailer has started. Log path: %s; channel name: %s.',
-            self._log_path, self._channel)
+        logger.info('Tailer has started. Log path: %s', self._log_path)
 
-        # Publish the lines that already was in the file:
-        with open(self._log_path) as log:
-            log_lines = log.read().splitlines()
-            for line in log_lines:
-                self._backlog(line)
-        tailf = subprocess.Popen(['/usr/bin/tail', '--lines', '0', '-f', self._log_path],
+#        # Publish the lines that already was in the file:
+        #with open(self._log_path) as log:
+            #log_lines = log.read().splitlines()
+            #for line in log_lines:
+                #self._backlog(line)
+        tailf = subprocess.Popen(['/usr/bin/tail', '-f', self._log_path],   #'--lines', '0', 
                                  stdout=subprocess.PIPE)
         try:
             fl = fcntl.fcntl(tailf.stdout, fcntl.F_GETFL)
@@ -129,12 +148,9 @@ class Tailer(threading.Thread):
                     iterations_without_read += 1
                     if iterations_without_read * self._read_timeout < self._kill_timeout:
                         continue
-                    message = 'Sorry, your script has stalled and been killed.\n'
-                    with open(self._log_path, 'a') as log:
-                        log.write(message)
-                    self._publish([message])
-                    self._kill_container()
-                    return
+                    else:
+                        self._kill_container()
+                        return
                 else:
                     iterations_without_read = 0
 
@@ -147,7 +163,7 @@ class Tailer(threading.Thread):
                     buf = lines[-1]
                 lines = lines[:-1]
 
-                self._publish(lines)
+                self._publisher.publish(lines)
         finally:
             tailf.terminate()
             tailf.wait()
@@ -338,9 +354,8 @@ class Builder(threading.Thread):
 
 
 @contextlib.contextmanager
-def _run(redis_client, channel, stall_timeout, clone_url, commit_sha,
-         docker_image, script, deploy_key=None, remove_container=True,
-         remove_channel=True, init_stdout=''):
+def _run(publisher, stall_timeout, clone_url, commit_sha,
+         docker_image, script, deploy_key=None, remove_container=True):
     yielded = False
     stdout = ''
     try:
@@ -357,18 +372,16 @@ def _run(redis_client, channel, stall_timeout, clone_url, commit_sha,
                 message_queue=message_queue)
 
             log_path = os.path.join(working_dir, 'script.log')
+            stop_reason = ''
             try:
                 # Start Builder and wait until it will create the container
                 builder.start()
                 container = message_queue.get(block=True, timeout=60)
-                with open(log_path, 'w') as log:
-                    log.write(init_stdout)
 
                 # Now the container id is known and we can pass it to Tailer
                 tailer = Tailer(
                     log_path=log_path,
-                    redis_client=redis_client,
-                    channel=channel,
+                    publisher=publisher,
                     container=container,
                     kill_timeout=stall_timeout)
                 tailer.start()
@@ -378,13 +391,11 @@ def _run(redis_client, channel, stall_timeout, clone_url, commit_sha,
                     builder.join()
                 finally:
                     tailer.stop()
+                    if tailer.has_killed_container:
+                        stop_reason = '\nSorry, your script has stalled and been killed.\n'
             finally:
                 if builder.container and remove_container:
                     docker.remove_container(builder.container)
-                if remove_channel:
-                    # Remove `channel` key to let `tailer` module
-                    # stop listening pubsub channel
-                    redis_client.delete(channel)
 
                 if os.path.exists(log_path):
                     with open(log_path, 'r') as log:
@@ -398,7 +409,9 @@ def _run(redis_client, channel, stall_timeout, clone_url, commit_sha,
                     raise builder.exc_info[1], None, builder.exc_info[2]
                 else:
                     try:
-                        yield builder.return_code, stdout, builder.container
+                        yield (builder.return_code,
+                               stdout + stop_reason,
+                               builder.container)
                     except:
                         raise
                     finally:
@@ -457,72 +470,81 @@ def do_job(hook_call_id):
     hook = hook_call.hook
     project = hook.project
     config = current_app.config
+
     redis_client = redis.StrictRedis(host=config['KOZMIC_REDIS_HOST'],
                                      port=config['KOZMIC_REDIS_PORT'],
                                      db=config['KOZMIC_REDIS_DATABASE'])
+    publisher = Publisher(redis_client=redis_client, channel=job.task_uuid)
 
-    kwargs = dict(
-        redis_client=redis_client,
-        channel=job.task_uuid,
-        stall_timeout=config['KOZMIC_STALL_TIMEOUT'],
-        clone_url=(project.gh_https_clone_url if project.is_public else
-                   project.gh_ssh_clone_url),
-        commit_sha=hook_call.build.gh_commit_sha)
-
-    logger.info('Pulling %s image...', hook.docker_image)
+    stdout = ''
     try:
-        docker.pull(hook.docker_image)
-        # Make sure that image has been successfully pulled by calling
-        # `inspect_image` on it:
-        docker.inspect_image(hook.docker_image)
-    except DockerAPIError as e:
-        logger.info('Failed to pull %s: %s.', hook.docker_image, e)
-        job.finished(1)
-        job.stdout = str(e)
-        db.session.commit()
-        return
-    else:
-        logger.info('%s image has been pulled.', hook.docker_image)
+        kwargs = dict(
+            publisher=publisher,
+            stall_timeout=config['KOZMIC_STALL_TIMEOUT'],
+            clone_url=(project.gh_https_clone_url if project.is_public else
+                       project.gh_ssh_clone_url),
+            commit_sha=hook_call.build.gh_commit_sha)
 
-    if not project.is_public:
-        project.deploy_key.ensure()
+        message = 'Pulling "{}" Docker image...'.format(hook.docker_image)
+        logger.info(message)
+        publisher.publish(message)
+        stdout = message + '\n'
 
-    if not project.is_public:
-        kwargs['deploy_key'] = (
-            project.deploy_key.rsa_private_key,
-            project.passphrase)
-
-    install_stdout = ''
-    if job.hook_call.hook.install_script:
-        cached_image = 'kozmic-cache/{}'.format(job.get_cache_id())
-        if docker.images(cached_image):
-            install_stdout = ('Skipping install script as tracked files '
-                              'did not change...\n\n')
+        try:
+            docker.pull(hook.docker_image)
+            # Make sure that image has been successfully pulled by calling
+            # `inspect_image` on it:
+            docker.inspect_image(hook.docker_image)
+        except DockerAPIError as e:
+            logger.info('Failed to pull %s: %s.', hook.docker_image, e)
+            job.finished(1)
+            job.stdout = str(e)
+            db.session.commit()
+            return
         else:
-            with _run(docker_image=hook.docker_image,
-                      script=hook.install_script,
-                      remove_container=False,
-                      remove_channel=False,
-                      **kwargs) as (return_code, install_stdout, container):
-                if return_code == 0:
-                    docker.commit(container['Id'], repository=cached_image)
-                    docker.remove_container(container)
-                else:
-                    job.finished(return_code)
-                    job.stdout = install_stdout
-                    db.session.commit()
-                    return
-            assert docker.images(cached_image)
-        docker_image = cached_image
-    else:
-        docker_image = job.hook_call.hook.docker_image
+            logger.info('%s image has been pulled.', hook.docker_image)
 
-    with _run(docker_image=docker_image,
-              script=hook.build_script,
-              init_stdout=install_stdout,
-              remove_container=True,
-              **kwargs) as (return_code, build_stdout, container):
-        job.finished(return_code)
-        job.stdout = build_stdout
-        db.session.commit()
-        return
+        if not project.is_public:
+            project.deploy_key.ensure()
+
+        if not project.is_public:
+            kwargs['deploy_key'] = (
+                project.deploy_key.rsa_private_key,
+                project.passphrase)
+
+        if job.hook_call.hook.install_script:
+            cached_image = 'kozmic-cache/{}'.format(job.get_cache_id())
+            if docker.images(cached_image):
+                install_stdout = ('Skipping install script as tracked files '
+                                  'did not change...')
+                publisher.publish(install_stdout)
+                stdout += install_stdout + '\n'
+            else:
+                with _run(docker_image=hook.docker_image,
+                          script=hook.install_script,
+                          remove_container=False,
+                          **kwargs) as (return_code, install_stdout, container):
+                    stdout += install_stdout
+                    if return_code == 0:
+                        docker.commit(container['Id'], repository=cached_image)
+                        docker.remove_container(container)
+                    else:
+                        job.finished(return_code)
+                        job.stdout = stdout
+                        db.session.commit()
+                        return
+                assert docker.images(cached_image)
+            docker_image = cached_image
+        else:
+            docker_image = job.hook_call.hook.docker_image
+
+        with _run(docker_image=docker_image,
+                  script=hook.build_script,
+                  remove_container=True,
+                  **kwargs) as (return_code, build_stdout, container):
+            job.finished(return_code)
+            job.stdout = stdout + build_stdout
+            db.session.commit()
+            return
+    finally:
+        publisher.finish()

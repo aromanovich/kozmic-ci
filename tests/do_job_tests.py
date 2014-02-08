@@ -77,7 +77,9 @@ class TestDoJob(TestCase):
 
         job = self._do_job(hook_call)
         assert job.return_code == 0
-        assert job.stdout == 'installed!\nit works\nYEAH\n'
+        assert job.stdout == (
+            'Pulling "{}" Docker image...\n'
+             'installed!\nit works\nYEAH\n'.format(self.hook.docker_image))
         assert client.images(cached_image)
 
         build = factories.BuildFactory.create(
@@ -89,8 +91,11 @@ class TestDoJob(TestCase):
 
         job = self._do_job(hook_call)
         assert job.return_code == 0
-        assert job.stdout == ('Skipping install script as tracked files '
-                              'did not change...\n\nit works\nYEAH\n')
+        assert job.stdout == (
+            'Pulling "{}" Docker image...\n'
+            'Skipping install script as tracked files did not change...\n'
+            'it works\n'
+            'YEAH\n'.format(self.hook.docker_image))
 
     def test_public_project(self):
         self.hook.install_script = ''
@@ -108,7 +113,9 @@ class TestDoJob(TestCase):
 
         job = self._do_job(hook_call)
         assert job.return_code == 0
-        assert job.stdout == 'Hello!\n'
+        assert job.stdout == (
+            'Pulling "{}" Docker image...\n'
+            'Hello!\n'.format(self.hook.docker_image))
 
     def teardown_method(self, method):
         shutil.rmtree(self.working_dir)
