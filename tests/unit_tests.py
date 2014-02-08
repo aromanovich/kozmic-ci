@@ -616,8 +616,7 @@ class TestBuilder(TestCase):
             message_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
                 docker=docker._get_current_object(),
-                rsa_private_key=private_key,
-                passphrase=passphrase,
+                deploy_key=(private_key, passphrase),
                 docker_image='kozmic/ubuntu-base:12.04',
                 script='#!/bin/bash\nbash ./kozmic.sh',
                 working_dir=build_dir,
@@ -648,8 +647,8 @@ class TestBuilder(TestCase):
             message_queue = Queue.Queue()
             builder = kozmic.builds.tasks.Builder(
                 docker=docker._get_current_object(),
-                rsa_private_key=utils.generate_private_key('passphrase'),
-                passphrase='wrong-passphrase',
+                deploy_key=(utils.generate_private_key('passphrase'),
+                            'wrong-passphrase'),
                 docker_image='kozmic/ubuntu-base:12.04',
                 script='#!/bin/bash\nbash ./kozmic.sh',
                 working_dir=build_dir,

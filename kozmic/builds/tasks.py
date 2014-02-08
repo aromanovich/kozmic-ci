@@ -174,13 +174,16 @@ trap cleanup EXIT
 
 # Add GitHub to known hosts
 ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
-# Start ssh-agent service...
-eval `ssh-agent -s`
-# ...and add private key to the agent, so we won't be asked
-# for passphrase during git clone. Let ssh-add read passphrase
-# by running askpass.sh for the security's sake.
-SSH_ASKPASS=/kozmic/askpass.sh DISPLAY=:0.0 nohup ssh-add /kozmic/id_rsa
-rm /kozmic/askpass.sh /kozmic/id_rsa
+
+if [ -f /kozmic/id_rsa ] && [ -f /kozmic/askpass.sh ]; then
+  # Start ssh-agent service...
+  eval `ssh-agent -s`
+  # ...and add private key to the agent, so we won't be asked
+  # for passphrase during git clone. Let ssh-add read passphrase
+  # by running askpass.sh for the security's sake.
+  SSH_ASKPASS=/kozmic/askpass.sh DISPLAY=:0.0 nohup ssh-add /kozmic/id_rsa
+  rm /kozmic/askpass.sh /kozmic/id_rsa
+fi
 
 git clone {clone_url} /kozmic/src
 cd /kozmic/src && git checkout -q {commit_sha}
@@ -208,7 +211,7 @@ echo {passphrase}
 
 
 class Builder(threading.Thread):
-    """A thread that starts build script in a container and waits
+    """A thread that starts a script in a container and waits
     for it to complete.
 
     One of the following attributes is not ``None`` once
@@ -233,11 +236,8 @@ class Builder(threading.Thread):
                           by calling :meth:`Queue.Queue.task_done`.
     :type message_queue: :class:`Queue.Queue`
 
-    :param rsa_private_key: deploy private key
-    :type rsa_private_key: str
-
-    :param passphrase: passphrase for :attr:`rsa_private_key`
-    :type passphrase: str
+    :param deploy_key: a pair of strings (private key, passphrase)
+    :type deploy_key: 2-tuple of strings
 
     :param docker_image: a name of Docker image to be used for
                          :attr:`build_script` execution. The image
@@ -254,20 +254,23 @@ class Builder(threading.Thread):
     :param commit_sha: SHA of the commit to be checked out
     :type commit_sha: str
     """
-    def __init__(self, docker, message_queue, rsa_private_key, passphrase,
-                 docker_image, script, working_dir, clone_url, commit_sha,
-                 remove_container=True):
+    def __init__(self, docker, message_queue, docker_image, script,
+                 working_dir, clone_url, commit_sha, deploy_key=None):
         threading.Thread.__init__(self)
+
         self._docker = docker
-        self._rsa_private_key = rsa_private_key
-        self._passphrase = passphrase
+        self._message_queue = message_queue
         self._docker_image = docker_image
         self._build_script = script
         self._working_dir = working_dir
         self._clone_url = clone_url
         self._commit_sha = commit_sha
-        self._message_queue = message_queue
-        self._remove_container = remove_container
+
+        self._rsa_private_key = None
+        self._passphrase = None
+        if deploy_key:
+            self._rsa_private_key, self._passphrase = deploy_key
+
         self.return_code = None
         self.exc_info = None
         self.container = None
@@ -290,18 +293,6 @@ class Builder(threading.Thread):
         with open(script_starter_sh_path, 'w') as script_starter_sh:
             script_starter_sh.write(script_starter_sh_content)
 
-        askpass_sh_path = working_dir_path('askpass.sh')
-        askpass_sh_content = ASKPASS_SH.format(
-            passphrase=pipes.quote(self._passphrase))
-        with open(askpass_sh_path, 'w') as askpass_sh:
-            askpass_sh.write(askpass_sh_content)
-        os.chmod(askpass_sh_path, 0o100)
-
-        id_rsa_path = working_dir_path('id_rsa')
-        with open(id_rsa_path, 'w') as id_rsa:
-            id_rsa.write(self._rsa_private_key)
-        os.chmod(id_rsa_path, 0o400)
-
         script_path = working_dir_path('script.sh')
         with open(script_path, 'w') as script:
             script.write(self._build_script)
@@ -311,6 +302,19 @@ class Builder(threading.Thread):
         with open(log_path, 'w') as log:
             log.write('')
         os.chmod(log_path, 0o664)
+
+        if self._rsa_private_key and self._passphrase:
+            askpass_sh_path = working_dir_path('askpass.sh')
+            askpass_sh_content = ASKPASS_SH.format(
+                passphrase=pipes.quote(self._passphrase))
+            with open(askpass_sh_path, 'w') as askpass_sh:
+                askpass_sh.write(askpass_sh_content)
+            os.chmod(askpass_sh_path, 0o100)
+
+            id_rsa_path = working_dir_path('id_rsa')
+            with open(id_rsa_path, 'w') as id_rsa:
+                id_rsa.write(self._rsa_private_key)
+            os.chmod(id_rsa_path, 0o400)
 
         logger.info('Starting Docker process...')
         self.container = self._docker.create_container(
@@ -326,8 +330,6 @@ class Builder(threading.Thread):
 
         return_code = self._docker.wait(self.container)
         logger.info('Docker process log: %s', self._docker.logs(self.container))
-        if self._remove_container:
-            self._docker.remove_container(self.container)
         logger.info('Docker process %s has finished with return code %i.',
                     self.container, return_code)
         logger.info('Builder has finished.')
@@ -336,25 +338,23 @@ class Builder(threading.Thread):
 
 
 @contextlib.contextmanager
-def _run(redis_client, channel, stall_timeout,
-         rsa_private_key, passphrase, clone_url, commit_sha,
-         docker_image, script, remove_container=True, remove_channel=True,
-         init_stdout=''):
+def _run(redis_client, channel, stall_timeout, clone_url, commit_sha,
+         docker_image, script, deploy_key=None, remove_container=True,
+         remove_channel=True, init_stdout=''):
+    yielded = False
     stdout = ''
     try:
         with create_temp_dir() as working_dir:
             message_queue = Queue.Queue()
             builder = Builder(
                 docker=docker._get_current_object(),  # `docker` is a local proxy
-                rsa_private_key=rsa_private_key,
-                passphrase=passphrase,
+                deploy_key=deploy_key,
                 clone_url=clone_url,
                 commit_sha=commit_sha,
                 docker_image=docker_image,
                 script=script,
                 working_dir=working_dir,
-                message_queue=message_queue,
-                remove_container=remove_container)
+                message_queue=message_queue)
 
             log_path = os.path.join(working_dir, 'script.log')
             try:
@@ -379,6 +379,8 @@ def _run(redis_client, channel, stall_timeout,
                 finally:
                     tailer.stop()
             finally:
+                if builder.container and remove_container:
+                    docker.remove_container(builder.container)
                 if remove_channel:
                     # Remove `channel` key to let `tailer` module
                     # stop listening pubsub channel
@@ -398,13 +400,16 @@ def _run(redis_client, channel, stall_timeout,
                     try:
                         yield builder.return_code, stdout, builder.container
                     except:
-                        return
-                        # otherwise we get "generator didn't stop after
-                        # throw()" error if nested code raised exception
+                        raise
+                    finally:
+                        yielded = True  # otherwise we get "generator didn't
+                                        # stop after throw()" error if nested
+                                        # code raised exception
     except:
         stdout += ('\nSorry, something went wrong. We are notified of '
                    'the issue and will fix it soon.')
-        yield 1, stdout, None
+        if not yielded:
+            yield 1, stdout, None
         raise
 
 
@@ -460,8 +465,6 @@ def do_job(hook_call_id):
         redis_client=redis_client,
         channel=job.task_uuid,
         stall_timeout=config['KOZMIC_STALL_TIMEOUT'],
-        rsa_private_key=project.deploy_key.rsa_private_key,
-        passphrase=project.passphrase,
         clone_url=project.gh_clone_url,
         commit_sha=hook_call.build.gh_commit_sha)
 
@@ -482,6 +485,11 @@ def do_job(hook_call_id):
 
     if not project.is_public:
         project.deploy_key.ensure()
+
+    if not project.is_public:
+        kwargs['deploy_key'] = (
+            project.deploy_key.rsa_private_key,
+            project.passphrase)
 
     install_stdout = ''
     if job.hook_call.hook.install_script:
