@@ -5,10 +5,11 @@ import shutil
 import contextlib
 
 import mock
-import docker
 from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
+import kozmic.builds.utils
+from kozmic import docker
 from kozmic.models import Project, DeployKey, Build, Job, TrackedFile
 from . import TestCase, factories, utils
 
@@ -61,12 +62,15 @@ class TestDoJob(TestCase):
         cache_id = 'qwerty'
         cached_image = 'kozmic-cache/{}'.format(cache_id)
 
-        client = docker.Client()
         try:
-            client.remove_image('kozmic-cache/qwerty')
+            for image_data in docker.images(cached_image):
+                for repo_tag in image_data['RepoTags']:
+                    if repo_tag.startswith(cached_image):
+                        docker.remove_image(image_data['Id'])
+                        break
         except:
             pass
-        assert not client.images(cached_image)
+        assert not docker.images(cached_image)
 
         build = factories.BuildFactory.create(
             project=self.project,
@@ -80,7 +84,7 @@ class TestDoJob(TestCase):
         assert job.stdout == (
             'Pulling "{}" Docker image...\n'
              'installed!\nit works\nYEAH\n'.format(self.hook.docker_image))
-        assert client.images(cached_image)
+        assert docker.images(cached_image)
 
         build = factories.BuildFactory.create(
             project=self.project,

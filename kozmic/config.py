@@ -18,6 +18,7 @@ class DefaultConfig(object):
     KOZMIC_REDIS_DATABASE = 0
     KOZMIC_STALL_TIMEOUT = 600
     KOZMIC_ENABLE_EMAIL_NOTIFICATIONS = True
+    KOZMIC_CACHED_IMAGES_LIMIT = 3
 
     DOCKER_URL = 'unix://var/run/docker.sock'
     DOCKER_API_VERSION = '1.8'

@@ -7,6 +7,7 @@ import Queue
 import datetime as dt
 import hashlib
 import json
+import random
 
 import httpretty
 import pytest
@@ -19,6 +20,7 @@ from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
 import kozmic.builds.views
+import kozmic.builds.utils
 from kozmic import mail, docker
 from kozmic.models import (db, DeployKey, Project, Membership, User, Hook,
                            HookCall, Job, Build, TrackedFile)
@@ -829,3 +831,56 @@ class TestJobDB(TestCase):
         cache_id = self.job.get_cache_id()
         assert cache_id not in seen_cache_ids
         seen_cache_ids.add(cache_id)
+
+
+class TestCommands(TestCase):
+    @mock.patch('kozmic.builds.commands.docker')
+    def test_clean_dependencies_cache(self, docker_mock):
+        i = 'kozmic-cache/{}'.format
+        docker_mock.images.return_value = [
+            {'Repository': i('a1'), 'Tag': '1', 'Created': 1389658801},
+            {'Repository': i('b1'), 'Tag': '1', 'Created': 1389658800},
+            {'Repository': i('c1'), 'Tag': '1', 'Created': 1389658805},
+            {'Repository': i('d1'), 'Tag': '1', 'Created': 1389658806},
+            {'Repository': i('e1'), 'Tag': '1', 'Created': 1389650000},
+            {'Repository': i('a2'), 'Tag': '2', 'Created': 1389658212},
+        ]
+        kozmic.builds.commands.clean_dependencies_cache()
+        assert docker_mock.remove_image.call_args_list == [
+            mock.call(i('e1')),
+            mock.call(i('b1')),
+        ]
+
+
+class TestUtils(TestCase):
+    @mock.patch('kozmic.builds.commands.docker')
+    def test_does_docker_image_exist(self, docker_mock):
+        docker_mock.images.return_value = [
+            {
+                'RepoTag': [
+                    'ubuntu:12.04',
+                    'ubuntu:precise',
+                    'ubuntu:latest'
+                ],
+                'Id': '8dbd9e392a964056420e5d58ca5cc376ef18e2de93b5cc90e868a1bbc8318c1c',
+                'Created': 1365714795,
+                'Size': 131506275,
+                'VirtualSize': 131506275
+            },
+            {
+                'RepoTag': [
+                    'ubuntu:12.10',
+                    'ubuntu:quantal'
+                ],
+                'ParentId': '27cf784147099545',
+                'Id': 'b750fe79269d2ec9a3c593ef05b4332b1d1a02a62b4accb2c21d589ff2f5f2dc',
+                'Created': 1364102658,
+                'Size': 24653,
+                'VirtualSize': 180116135
+            }
+        ]
+
+        assert kozmic.builds.utils.does_docker_image_exist('ubuntu', tag='12.04')
+        assert kozmic.builds.utils.does_docker_image_exist('ubuntu')
+        assert not kozmic.builds.utils.does_docker_image_exist('ubuntu', tag='qwerty')
+        assert not kozmic.builds.utils.does_docker_image_exist('debian')

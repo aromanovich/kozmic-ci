@@ -29,6 +29,7 @@ from docker import APIError as DockerAPIError
 from kozmic import db, celery, docker
 from kozmic.models import Build, Job, HookCall
 from . import get_ansi_to_html_converter
+from .utils import does_docker_image_exist
 
 
 logger = get_task_logger(__name__)
@@ -446,6 +447,7 @@ def restart_job(id):
     do_job.apply(args=(job.hook_call_id,))
 
 
+
 @celery.task
 def do_job(hook_call_id):
     """A Celery task that does a job specified by a hook call.
@@ -514,7 +516,8 @@ def do_job(hook_call_id):
 
         if job.hook_call.hook.install_script:
             cached_image = 'kozmic-cache/{}'.format(job.get_cache_id())
-            if docker.images(cached_image):
+            cached_image_tag = str(project.id)
+            if does_docker_image_exist(cached_image, cached_image_tag):
                 install_stdout = ('Skipping install script as tracked files '
                                   'did not change...')
                 publisher.publish(install_stdout)
@@ -526,7 +529,12 @@ def do_job(hook_call_id):
                           **kwargs) as (return_code, install_stdout, container):
                     stdout += install_stdout
                     if return_code == 0:
-                        docker.commit(container['Id'], repository=cached_image)
+                        # Install script has finished successfully. So we
+                        # promote the resulting container to an image that
+                        # we will use for running the build script in
+                        # this and consequent jobs
+                        docker.commit(container['Id'], repository=cached_image,
+                                      tag=cached_image_tag)
                         docker.remove_container(container)
                     else:
                         job.finished(return_code)
@@ -534,7 +542,7 @@ def do_job(hook_call_id):
                         db.session.commit()
                         return
                 assert docker.images(cached_image)
-            docker_image = cached_image
+            docker_image = cached_image + ':' + cached_image_tag
         else:
             docker_image = job.hook_call.hook.docker_image
 
