@@ -1,0 +1,2 @@
+# m  h  dom mon dow user    command
+  *  *   *   *   *  kozmic  cd /src && KOZMIC_CONFIG=kozmic.config_local.Config ./manage.py clean_dependencies_cache 2>&1 | logger -i -p cron.info
