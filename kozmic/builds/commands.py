@@ -1,3 +1,4 @@
+import logging
 import collections
 import datetime as dt
 
@@ -6,28 +7,36 @@ import flask
 from kozmic import docker
 
 
-def clean_dependencies_cache():
+logger = logging.getLogger(__name__)
+
+
+def clean_dependencies_cache(verbose=True):
     images_by_projects = collections.defaultdict(list)
     limit = flask.current_app.config['KOZMIC_CACHED_IMAGES_LIMIT']
 
-    for image in docker.images():
-        repository = image['Repository']
-        created_at = image['Created']
-        tag = image['Tag']
+    for image_data in docker.images():
+        created_at = image_data['Created']
 
-        if not repository.startswith('kozmic-cache/'):
-            continue
+        for repo_tag in image_data['RepoTags']:
+            if not repo_tag.startswith('kozmic-cache/'):
+                continue
 
-        try:
-            project_id = int(tag)
-        except ValueError:
-            continue
+            try:
+                repository, tag = repo_tag.split(':')
+            except ValueError:
+                continue
 
-        images_by_projects[project_id].append((created_at, repository))
+            try:
+                project_id = int(tag)
+            except ValueError:
+                continue
+
+            images_by_projects[project_id].append((created_at, repository))
+            break
 
     for project_id, timestamped_images in images_by_projects.iteritems():
         images_to_remove = [image for _, image in
                             sorted(timestamped_images)[:-limit]]
         for image in images_to_remove:
             docker.remove_image(image)
-            print('Removed {}'.format(image))
+            logger.info('Removed %s', image)
