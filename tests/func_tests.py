@@ -633,7 +633,7 @@ class TestBuilds(TestCase):
         self.login(user_id=self.user.id)
         r = self.w.get(url_for('projects.build', project_id=self.project.id,
                                id=self.build.id))
-        with mock.patch('kozmic.builds.tasks.restart_job') as restart_job_mock:
+        with mock.patch('kozmic.projects.views.restart_job') as restart_job_mock:
             r.click('Restart').follow()
         restart_job_mock.delay.assert_called_once_with(job.id)
         assert job.build.status == 'enqueued'

@@ -118,7 +118,6 @@ class Tailer(threading.Thread):
     def is_stopped(self):
         return self._stop.isSet()
 
-
     def _kill_container(self):
         logger.info('Tailer is killing %s', self._container)
         docker.kill(self._container)
@@ -128,12 +127,7 @@ class Tailer(threading.Thread):
     def run(self):
         logger.info('Tailer has started. Log path: %s', self._log_path)
 
-#        # Publish the lines that already was in the file:
-        #with open(self._log_path) as log:
-            #log_lines = log.read().splitlines()
-            #for line in log_lines:
-                #self._backlog(line)
-        tailf = subprocess.Popen(['/usr/bin/tail', '-f', self._log_path],   #'--lines', '0', 
+        tailf = subprocess.Popen(['/usr/bin/tail', '-f', self._log_path],
                                  stdout=subprocess.PIPE)
         try:
             fl = fcntl.fcntl(tailf.stdout, fcntl.F_GETFL)
@@ -445,7 +439,6 @@ def restart_job(id):
     db.session.delete(job)
     # Run do_job task synchronously:
     do_job.apply(args=(job.hook_call_id,))
-
 
 
 @celery.task

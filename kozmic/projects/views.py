@@ -9,6 +9,7 @@ from . import bp
 from .forms import HookForm, MemberForm
 from kozmic import db, perms
 from kozmic.models import MISSING_ID, Project, User, Membership, Hook, Build, Job
+from kozmic.builds.tasks import restart_job
 
 
 logger = logging.getLogger(__name__)
@@ -125,9 +126,6 @@ def job_log(project_id, id):
 
 @bp.route('/<int:project_id>/job/<int:id>/restart/')
 def job_restart(project_id, id):
-    # Import at runtime for easier mocking:
-    from kozmic.builds.tasks import restart_job
-
     project = get_project(project_id, for_management=True)
     job = project.builds.join(Job).filter(
         Job.id == id).with_entities(Job).first_or_404()
@@ -142,13 +140,25 @@ def settings(id):
     project = get_project(id, for_management=False)
     members = project.members.join(Membership).with_entities(
         User, Membership.allows_management).all()
+    kwargs = {
+        'fqdn': current_app.config['SERVER_NAME'],
+        'protocol': ('https' if current_app.config['KOZMIC_USE_HTTPS_FOR_BADGES']
+                     else 'http'),
+        'project_id': project.id,
+        'project_full_name': project.gh_full_name,
+    }
+    example_badge_href = ('http://{fqdn}/projects/{project_id}/'
+                          'builds/latest/?ref=master'.format(**kwargs))
+    example_badge_src = ('https://{fqdn}/badges/{project_full_name}/'
+                         'master'.format(**kwargs))
     return render_template(
         'projects/settings.html',
         project=project,
         members=members,
         is_current_user_a_manager=perms.manage_project(id).can(),
         can_current_user_delete_a_project=perms.delete_project(id).can(),
-        fqdn=current_app.config['SERVER_NAME'])
+        example_badge_href=example_badge_href,
+        example_badge_src=example_badge_src)
 
 
 @bp.route('/<int:project_id>/hooks/ensure/', methods=('POST',))
