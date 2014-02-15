@@ -28,7 +28,7 @@ def upgrade():
         project.gh_ssh_clone_url = project.gh.ssh_url
         project.gh_https_clone_url = project.gh.clone_url
         db.session.add(project)
-        db.session.commit()
+    db.session.commit()
     op.drop_column('organization_repository', 'gh_clone_url')
     op.drop_column('project', 'gh_clone_url')
     op.drop_column('user_repository', 'gh_clone_url')
