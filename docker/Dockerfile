@@ -6,11 +6,11 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6E63A3B44CF61F28A8A
 RUN echo "deb http://ppa.launchpad.net/tmortensen/rsyslogv7/ubuntu precise main" >> /etc/apt/sources.list
 RUN apt-get update -qq
 RUN apt-get install -y python-apt ca-certificates git python-pip python-dev libev4 libev-dev \
-                       libssh-dev libpcre3-dev rsyslog lxc iptables aufs-tools
+                       libssh-dev libpcre3-dev rsyslog lxc iptables aufs-tools cron
 RUN pip install supervisor
 RUN groupadd docker
 RUN useradd -m -d /home/kozmic -G docker -s /bin/bash kozmic
-RUN git clone https://github.com/aromanovich/kozmic-ci.git /src/
+RUN git  clone https://github.com/aromanovich/kozmic-ci.git /src/   
 RUN pip install -r /src/requirements/kozmic.txt
 RUN pip install -r /src/requirements/tailer.txt
 ADD https://get.docker.io/builds/Linux/x86_64/docker-latest /bin/docker
