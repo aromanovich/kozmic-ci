@@ -311,24 +311,24 @@ class DeployKey(db.Model):
         self.rsa_private_key = rsa_key.exportKey(format='PEM', passphrase=passphrase)
         self.rsa_public_key = rsa_key.publickey().exportKey(format='OpenSSH')
 
+    def _get_gh_key(self):
+        return (None if self.gh_id in (None, MISSING_ID) else
+                self.project.gh.key(self.gh_id))
+
     def ensure(self):
         """If the corresponding GitHub deploy key does not exist, creates it.
         Returns True if there weren't GitHub API errors; False otherwise.
         """
-        gh_key = (self.project.gh.key(self.gh_id)
-                  if self.gh_id != MISSING_ID else None)
-        if gh_key:
-            return True
-
         try:
-            gh_key = self.project.gh.create_key(
-                'Kozmic CI key', self.project.rsa_public_key)
+            gh_key = self._get_gh_key()
+            if gh_key:
+                return True
+            gh_key = self.project.gh.create_key('Kozmic CI key', self.rsa_public_key)
             self.gh_id = gh_key.id
         except github3.GitHubError as e:
             logger.warning(
-                'GitHub API call to add {project!r}\'s deploy key has failed '
-                'due to {e!r}. Errors: {e.errors!r}'.format(
-                    project=self.project, e=e))
+                'DeployKey.ensure call has failed due to {e!r}. '
+                'Errors: {e.errors!r}'.format(project=self.project, e=e))
             return False
         else:
             return True
@@ -339,17 +339,15 @@ class DeployKey(db.Model):
         """
         db.session.delete(self)
 
-        gh_key = self.project.gh.key(self.gh_id)
-        if not gh_key:
-            return True
-
         try:
+            gh_key = self._get_gh_key()
+            if not gh_key:
+                return True
             gh_key.delete()
         except github3.GitHubError as e:
             logger.warning(
-                'GitHub API call to delete {project}\'s key has failed. '
-                'The exception is "{e!r} and it\'s errors are '
-                '{e.errors!r}.".'.format(project=self.project, e=e))
+                'DeployKey.delete call has failed due to {e!r}. '
+                'Errors: {e.errors!r}'.format(project=self.project, e=e))
             return False
         else:
             return True
@@ -522,7 +520,7 @@ class Hook(db.Model):
 
         try:
             gh_hook = (self.project.gh.hook(self.gh_id)
-                       if self.gh_id != MISSING_ID else None)
+                       if self.gh_id not in (None, MISSING_ID) else None)
             if gh_hook:
                 if gh_hook.events != events or gh_hook.config != config:
                     gh_hook.edit(config=config, events=events)

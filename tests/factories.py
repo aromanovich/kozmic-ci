@@ -131,6 +131,7 @@ class ProjectFactory(Factory):
             with mock.patch('Crypto.PublicKey.RSA.generate',
                             return_value=CACHED_RSA_KEY):
                 project.deploy_key = DeployKey(passphrase=project.passphrase)
+                project.deploy_key.gh_id = 123
             db.session.commit()
 
 
