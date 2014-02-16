@@ -10,7 +10,7 @@ RUN apt-get install -y python-apt ca-certificates git python-pip python-dev libe
 RUN pip install supervisor
 RUN groupadd docker
 RUN useradd -m -d /home/kozmic -G docker -s /bin/bash kozmic
-RUN git  clone https://github.com/aromanovich/kozmic-ci.git /src/   
+RUN git clone https://github.com/aromanovich/kozmic-ci.git /src/
 RUN pip install -r /src/requirements/kozmic.txt
 RUN pip install -r /src/requirements/tailer.txt
 ADD https://get.docker.io/builds/Linux/x86_64/docker-latest /bin/docker

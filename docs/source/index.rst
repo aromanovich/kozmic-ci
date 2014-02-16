@@ -9,6 +9,5 @@ integrated with GitHub and powered by Docker.
 
    overview
    configuration
-   setup
-   setup-hard-way
+   installation
    internals

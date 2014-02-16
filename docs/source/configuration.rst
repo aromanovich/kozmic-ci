@@ -1,3 +1,5 @@
+.. _configuration:
+
 Configuration
 =============
 
@@ -17,7 +19,18 @@ Variables
 .. setting:: SERVER_NAME
 ``SERVER_NAME``
     The name and port number of the server (e.g., ``'kozmic-ci.company.com'``
-    or ``'127.0.0.1:5000'``
+    or ``'127.0.0.1:5000'``.
+
+.. setting:: SESSION_COOKIE_DOMAIN
+``SESSION_COOKIE_DOMAIN``
+    The domain for the session cookie. If this is not set, the cookie will
+    be valid for all subdomains of :setting:`SERVER_NAME`.
+
+    .. note::
+
+        If you're using an IP address as a :setting:`SERVER_NAME`, you must
+        specify the same IP address in :setting:`SESSION_COOKIE_DOMAIN`.
+        Otherwise cookies will not work.
 
 .. setting:: KOZMIC_GITHUB_CLIENT_ID
 ``KOZMIC_GITHUB_CLIENT_ID``

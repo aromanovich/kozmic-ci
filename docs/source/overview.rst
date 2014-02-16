@@ -3,7 +3,6 @@ System Overview
 
 What is Kozmic CI?
 ------------------
-
 Kozmic CI is a Docker powered continuous integration platform integrated with
 GitHub.
 
@@ -13,15 +12,14 @@ implementation and uWSGI as a websockets framework.
 
 Why is Kozmic CI?
 -----------------
+There are plenty of continuous integration tools out there and they all have
+pros and cons.
 
-There are plenty of continuous integration tools out there. And they all have
-their pros and cons.
-
-Some of them are very powerful but rather complex to use, like Jenkins or
-TeamCity. Sometimes something simpler will do just good. Travis CI seems a good
-way to go until you don't want to use custom VM image to run jobs or
-constantly find yourself littering the commit history trying to debug the
-over-complicated .travis.yml.
+Some of them are very powerful but rather complex to use, like Jenkins CI or
+TeamCity. Sometimes something simpler would be enough. Something like Travis CI
+seems a good way to go until you don't constantly find yourself littering the
+commit history trying to debug the over-complicated .travis.yml, or want to use
+a custom VM image for your builds.
 
 Kozmic CI is intended to be somewhere in between: to be easy to set up on your
 own server, configure and use, but flexible enough to be capable of performing
@@ -31,7 +29,6 @@ And hey, it's Docker powered! Docker is cool! :)
 
 Basics
 ------
-
 Kozmic CI is tightly integrated with GitHub.
 
 There are **users** and **projects**. Kozmic users correspond to GitHub users, Kozmic
@@ -60,7 +57,6 @@ A build status is reported to GitHub as a Commit Status.
 
 More About Hooks and Jobs
 -------------------------
-
 As it has been mentioned above, hooks describe jobs.
 
 To configure a hook, you must specify a Docker **base image** and a **build script**.
@@ -89,7 +85,6 @@ That provides a really powerful tool for caching dependencies.
 
 Base Images
 -----------
-
 Kozmic CI runs builds in isolated Docker containers that offer a clean
 environment for every build.
 
