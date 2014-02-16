@@ -19,7 +19,7 @@ Core
 .. automodule:: tailer
    :members:
 
-Packages overview
+Packages Overview
 -----------------
 
 .. automodule:: kozmic.__init__

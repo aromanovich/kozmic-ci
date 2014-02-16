@@ -1,88 +1,68 @@
-Installation and Set Up
-=======================
+Installation: the Fast Way
+==========================
 
-Basic prerequisites you’ll need in order to run Kozmic CI:
+Kozmic CI offers a Docker-based single-node distribution.
 
-* UNIX-based operating system 
-* Python 2.7
-* Redis
+It has some limitations (no HTTPS support; cached Docker images are
+stored inside the container and will be lost after it's death;
+and it is a single node configuration, after all), but it's
+the fastest and easiest way to get started.
+
+The basic prerequisites you’ll need in order to set it up:
+
+* Ubuntu 13.04
 * MySQL
+* Redis
 * Docker > 0.7.0
 
-Clone the code from https://github.com/aromanovich/kozmic-ci.
+Step 1: Register a new application on GitHub 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Go to https://github.com/settings/applications/new and create an application.
 
-Set up the requirements listed by ``./requirements/kozmic.txt`` and
-``./requirements/tailer.txt`` using pip.
+Set the homepage URL to ``http://my-server-ip-or-addr`` and the authorization
+callback URL to ``http://my-server-ip-or-addr/_auth/auth-callback``.
 
-Register a new OAuth apllication on GitHub:
-https://github.com/settings/applications/new.
+Step 2: Fill a Kozmic config
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Download https://raw.github.com/aromanovich/kozmic-ci/master/docker/config.py-docker.
 
-Configuration
--------------
+Change MySQL- and Redis-related variables according to your setup, specify a
+secret key, a client id and a client secret of your GitHub application.
 
-Fill ``./kozmic/config_local.py`` using ``./kozmic/config_local.py-dist``
-as an example. The following variables must be specified:
+Step 2: Pull a Docker image
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+::
 
-* ``SECRET_KEY``: a secret string. Used for signing cookie-based sessions,
-                  as a passphrase for private deploy keys, etc.
-* ``SERVER_NAME``: The name and port number of the server
-                   (e.g., ``'kozmic-ci.company.com'`` or ``'127.0.0.1:5000'``);
-* ``BROKER_URL``: Celery broker URL (default: ``'redis://localhost:6379/0'``);
-* ``MAIL_DEFAULT_SENDER``: "From" e-mail address to be used for notifications;
-* ``KOZMIC_REDIS_HOST``: Redis host (default: ``'localhost'``);
-* ``KOZMIC_REDIS_PORT``: Redis port (default: ``6379``);
-* ``KOZMIC_REDIS_DATABASE``: Redis database (default: ``0``);
-* ``KOZMIC_STALL_TIMEOUT``: Number of seconds since the last job output after
-                            which the job is considered "hung" and it's Docker
-                            container gets killed;
-* ``KOZMIC_GITHUB_CLIENT_ID``: OAuth client id;
-* ``KOZMIC_GITHUB_CLIENT_SECRET``: OAuth client secret;
-* ``SQLALCHEMY_DATABASE_URI``: SQLAlchemy connection string (e.g.,
-                               ``'mysql+pymysql://user:password@127.0.0.1/kozmic'``);
-* ``TAILER_URL_TEMPLATE``: URL template to be used to get a websocket URL for a job.
-                           Must point to a :mod:`tailer` application instance and
-                           contain ``job_id`` variable. (e.g.,
-                           ``'ws://kozmic-ci.company.com:8080/{job_id}/'``);
+    $ docker pull aromanovich/kozmic
 
-Default configuration expects to find an SMTP server on a local machine on port 25.
-It can be changed: http://pythonhosted.org/Flask-Mail/#configuring-flask-mail.
+The Dockerfile used to build ``aromanovich/kozmic``
+is available on GitHub: https://github.com/aromanovich/kozmic-ci/tree/master/docker.
 
-.. note:: 
-    Environment variable ``KOZMIC_CONFIG`` tells :func:`kozmic.create_app` which
-    config to use. For example, to run development server you can type:
-    ``KOZMIC_CONFIG=kozmic.config_local.DevelopmentConfig ./manage.py runserver``
+Step 2: Start a container
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Create a directory that will contain Kozmic CI logs and then run:
 
-Notes
------
+::
 
-* :mod:`tailer` must be run using uWSGI that is listed in its requirements
-  (``./requirements/tailer.txt``).
-* Kozmic CI status images are served through HTTPS to prevent GitHub from
-  caching them. If you're planning to use status badges, :mod:`kozmic`
-  server must support HTTPS.
+    docker run -e=WORKER_CONCURRENCY=2 \
+               -e=CONFIG="`cat ./config.py`" \
+               -p=80:80 -p=8080:8080 \
+               -v=/absolute/path/to/created/logs/directory/:/var/log/ \
+               -privileged aromanovich/kozmic /run.sh
 
-Deployment example with Supervisor and uWSGI
---------------------------------------------
+A few comments:
 
-The system contains of a three main components:
+* ``WORKER_CONCURRENCY`` env variable must contain a number of workers that
+  will run jobs
+* ``CONFIG`` env variable must contain a Python code defining a ``Config``
+  class inherited from ``kozmic.config.DefaultConfig``
+* ``-p=80:80 -p=8080:8080`` binds the container ports to the host system
+* ``-v=/absolute/path/to/created/logs/directory/:/var/log/`` mounts the logs
+  directory from the host into the container which allows us to see what's
+  happening inside the container
+* ``-privileged`` key is required to allow running `Docker within Docker`_.
 
-* A web application that implements UI and exposes webhooks (:mod:`kozmic`);
-* A uWSGI-application that tails job log into a websocket (:mod:`tailer`);
-* A Celery-worker that runs jobs.
+.. _Docker within Docker: http://blog.docker.io/2013/09/docker-can-now-run-within-docker/
 
-As of now, only single-node configuration is supported. It is recommended to use
-Supervisor for running all the components. Here are Supervisor example configuration files.
-
-Supervisor ``celery.conf``:
-
-.. literalinclude:: setup/supervisor-celery.conf
-
-Supervisor ``uwsgi.conf``:
-
-.. literalinclude:: setup/supervisor-uwsgi.conf
-
-uWSGI configuration files (to put in ``/etc/uwsgi/apps/``):
-
-.. literalinclude:: setup/uwsgi-kozmic.ini
-
-.. literalinclude:: setup/uwsgi-tailer.ini
+After starting the container, take a look at the ``logs`` directory content and
+make sure that it doesn't say any errors. That's it!

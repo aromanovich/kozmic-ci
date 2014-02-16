@@ -7,6 +7,8 @@ integrated with GitHub and powered by Docker.
 .. toctree::
    :maxdepth: 2
 
+   overview
+   configuration
    setup
-   images
+   setup-hard-way
    internals
