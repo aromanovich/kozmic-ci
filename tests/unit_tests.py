@@ -9,6 +9,7 @@ import hashlib
 import json
 import random
 
+import docker as _docker
 import httpretty
 import pytest
 import redis
@@ -889,11 +890,11 @@ class TestCommands(TestCase):
 
 
 class TestUtils(TestCase):
-    @mock.patch('kozmic.builds.commands.docker')
-    def test_does_docker_image_exist(self, docker_mock):
-        docker_mock.images.return_value = [
+    @mock.patch.object(_docker.Client, 'images')
+    def test_does_docker_image_exist(self, images_mock):
+        images_mock.return_value = [
             {
-                'RepoTag': [
+                'RepoTags': [
                     'ubuntu:12.04',
                     'ubuntu:precise',
                     'ubuntu:latest'
@@ -904,7 +905,7 @@ class TestUtils(TestCase):
                 'VirtualSize': 131506275
             },
             {
-                'RepoTag': [
+                'RepoTags': [
                     'ubuntu:12.10',
                     'ubuntu:quantal'
                 ],

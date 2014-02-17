@@ -5,6 +5,7 @@ import shutil
 import contextlib
 
 import mock
+import pytest
 from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
@@ -14,6 +15,7 @@ from kozmic.models import Project, DeployKey, Build, Job, TrackedFile
 from . import TestCase, factories, utils
 
 
+@pytest.mark.docker
 class TestDoJob(TestCase):
     def setup_method(self, method):
         TestCase.setup_method(self, method)
