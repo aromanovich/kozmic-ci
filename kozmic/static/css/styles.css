@@ -116,3 +116,15 @@ body {
 form#ensure-hooks {
   margin-bottom: 20px;
 }
+
+.CodeMirror {
+  border: 1px solid #ccc;
+}
+
+.has-error .CodeMirror {
+  border-color: #b94a48;
+}
+
+#hook-form .help-block {
+  font-size: 13px;
+}

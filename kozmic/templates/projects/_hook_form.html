@@ -1,0 +1,85 @@
+{% macro show_errors(field) %}
+  {%- for error in field.errors %}
+    <p class="help-block">{{ error }}</p>
+  {%- endfor %}
+{% endmacro %}
+
+{% macro hook_form(form) %}
+  <form id="hook-form" method="POST" role="form">
+    {{ form.csrf_token }}
+
+    {% with field=form.title %}
+      <div class="form-group{% if field.errors %} has-error{% endif %}">
+        <label for="{{ field.id }}">Title *</label>
+        {{ field(class='form-control') }}
+
+        {{ show_errors(field) }}
+      </div>
+    {% endwith %}
+
+    {% with field=form.docker_image %}
+      <div class="form-group{% if field.errors %} has-error{% endif %}">
+        <label for="{{ field.id }}">Docker base image *</label>
+        {{ field(class='form-control') }}
+
+        {{ show_errors(field) }}
+      </div>
+    {% endwith %}
+
+    {% with field=form.install_script %}
+      <div class="form-group{% if field.errors %} has-error{% endif %}">
+        <label for="{{ field.id }}">Install script</label>
+        {{ field(class='form-control editor') }}
+
+        {% if field.errors %}
+          {{ show_errors(field) }}
+        {% else %}
+          <p class="help-block">
+            Install build dependencies here.<br>
+            It will be run as an executable, so do not forget to put
+            a shebang directive at the beginning.
+          </p>
+        {% endif %}
+      </div>
+    {% endwith %}
+
+    {% with field=form.tracked_files%}
+      <div class="form-group{% if field.errors %} has-error{% endif %}">
+        <label for="{{ field.id }}">Tracked files</label>
+        {{ field(class='form-control') }}
+
+        {% if field.errors %}
+          {{ show_errors(field) }}
+        {% else %}
+          <p class="help-block">
+            Enter one path per line, the order doesn't matter.
+            Tracked files may include both regular files and directories.
+            <br>
+            Results of the install script are cached. The cache is invalidated
+            whenever the base Docker image, the install script or any of the
+            tracked files change. Remember to list here all the files used by
+            install script (such as pip's requirements.txt, Gemfile, etc).
+          </p>
+        {% endif %}
+      </div>
+    {% endwith %}
+
+    {% with field=form.build_script %}
+      <div class="form-group{% if field.errors %} has-error{% endif %}">
+        <label for="{{ field.id }}">Build script *</label>
+        {{ field(class='form-control editor') }}
+
+        {% if field.errors %}
+          {{ show_errors(field) }}
+        {% else %}
+          <p class="help-block">
+            It will be run as an executable, so do not forget to put a shebang
+            directive at the beginning.
+          </p>
+        {% endif %}
+      </div>
+    {% endwith %}
+    
+    <input class="btn btn-default" id="submit" name="submit" type="submit" value="Save">
+  </form>
+{% endmacro %}
