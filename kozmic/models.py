@@ -24,20 +24,21 @@ from . import db, mail, perms
 from .utils import JSONEncodedDict
 
 
-# XXX
-# TODO Make a pull request
+logger = logging.getLogger(__name__)
+
+
+MISSING_ID = -1
+
+
+# TODO Remove when
+# https://github.com/sigmavirus24/github3.py/commit/35b1f015f526ea881b804076fb111ffc025b2392
+# will be on PyPI
 def iter_collaborators(self, number=-1, etag=None):
     url = self._build_url('collaborators', base_url=self._api)
     return self._iter(int(number), url, github3.users.User, {}, etag)
 
 github3.repos.Repository.iter_collaborators = iter_collaborators
-# /XXX
-
-
-logger = logging.getLogger(__name__)
-
-
-MISSING_ID = -1
+# /TODO
 
 
 class RepositoryBase(object):
@@ -240,7 +241,7 @@ class User(HasRepositories, db.Model, UserMixin):
 
         for gh_repo_id, can_manage in github_data.iteritems():
             project = Project.query.filter_by(gh_id=gh_repo_id).first()
-            if not project or project.owner_id == self.id:
+            if not project or project.owner.id == self.id:
                 continue
             membership = Membership(
                 project=project,
@@ -472,7 +473,7 @@ class Project(db.Model):
 
         for gh_user_id, can_manage in github_data.iteritems():
             user = User.query.filter_by(gh_id=gh_user_id).first()
-            if not user or user.id == self.owner_id:
+            if not user or user.id == self.owner.id:
                 continue
             membership = Membership(
                 project=self,
