@@ -134,7 +134,8 @@ class User(HasRepositories, db.Model, UserMixin):
     email = db.Column(db.String(1000))
 
     def __repr__(self):
-        return u'<User #{0.id} gh_id={0.gh_id} gh_login={0.gh_login}>'.format(self)
+        return (u'<User #{0.id} gh_id={0.gh_id} gh_login={0.gh_login}>'
+                .format(self).encode('utf-8'))
 
     def get_identity(self):
         """Returns user's :class:`flask.ext.principal.Identity`."""
@@ -291,7 +292,8 @@ class Membership(db.Model):
         'Project', backref=db.backref('memberships', lazy='dynamic', cascade='all'))
 
     def __repr__(self):
-        return u'<Membership {0!r} {1!r}>'.format(self.user, self.project)
+        return (u'<Membership {0!r} {1!r}>'
+                .format(self.user, self.project).encode('utf-8'))
 
 
 class DeployKey(db.Model):
@@ -389,7 +391,8 @@ class Project(db.Model):
         'User', backref=db.backref('owned_projects', lazy='dynamic'))
 
     def __repr__(self):
-        return u'<Project #{0.id} "{0.gh_full_name}">'.format(self)
+        return (u'<Project #{0.id} "{0.gh_full_name}">'
+                .format(self).encode('utf-8'))
 
     @property
     def passphrase(self):
@@ -733,7 +736,7 @@ class Job(db.Model):
     hook_call = db.relationship('HookCall')
 
     def __repr__(self):
-        return u'<Job #{0.id}>'.format(self)
+        return u'<Job #{0.id}>'.format(self).encode('utf-8')
 
     def get_cache_id(self):
         """Returns a string that can be used for tagging a Docker image
