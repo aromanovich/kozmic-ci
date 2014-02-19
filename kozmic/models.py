@@ -278,8 +278,6 @@ class Organization(HasRepositories, db.Model):
 
 
 class Membership(db.Model):
-    __tablename__ = 'project_members'
-
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True)
 
@@ -303,7 +301,7 @@ class DeployKey(db.Model):
                            nullable=False)
 
     #: GitHub deploy key id
-    gh_id = db.Column(db.Integer, nullable=False, default=MISSING_ID)
+    gh_id = db.Column(db.Integer, nullable=False)
     #: RSA private deploy key in PEM format encrypted with the app secret key
     rsa_private_key = db.Column(db.Text, nullable=False)
     #: RSA public deploy key in OpenSSH format
@@ -384,7 +382,7 @@ class Project(db.Model):
         backref=db.backref('project'))
     #: Project members
     members = db.relationship(
-        'User', secondary='project_members', lazy='dynamic', viewonly=True,
+        'User', secondary=Membership.__tablename__, lazy='dynamic', viewonly=True,
         backref=db.backref('projects', lazy='dynamic', viewonly=True))
     #: Project owner
     owner = db.relationship(
@@ -494,7 +492,7 @@ class Hook(db.Model):
                            nullable=False)
 
     #: GitHub hook id
-    gh_id = db.Column(db.Integer, nullable=False, default=MISSING_ID)
+    gh_id = db.Column(db.Integer, nullable=False)
     #: Title
     title = db.Column(db.String(200), nullable=False)
     #: Install script
@@ -711,8 +709,6 @@ class HookCall(db.Model):
 
 class Job(db.Model):
     """A job that caused by a hook call."""
-    __tablename__ = 'build_step'
-
     id = db.Column(db.Integer, primary_key=True)
     build_id = db.Column(db.Integer, db.ForeignKey('build.id'),
                          nullable=False)

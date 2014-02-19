@@ -8,7 +8,8 @@ from flask.ext.login import current_user
 from . import bp
 from .forms import HookForm, MemberForm
 from kozmic import db, perms
-from kozmic.models import MISSING_ID, Project, User, Membership, Hook, Build, Job
+from kozmic.models import (MISSING_ID, Project, User, Membership, Hook,
+                           Build, Job)
 from kozmic.builds.tasks import restart_job
 
 
@@ -184,7 +185,7 @@ def add_hook(project_id):
 
     form = HookForm(request.form)
     if form.validate_on_submit():
-        hook = Hook(project=project)
+        hook = Hook(project=project, gh_id=MISSING_ID)
         form.populate_obj(hook)
         db.session.add(hook)
         db.session.flush()  # Flush SQL to get `hook.id`

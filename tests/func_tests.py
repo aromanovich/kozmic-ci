@@ -174,12 +174,16 @@ class TestProjects(TestCase):
 
         r = self.w.get('/').maybe_follow().click('Repositories')
 
+        def ensure_stub(self):
+            self.gh_id = 123
+            return True
         with mock.patch.object(Project, 'sync_memberships_with_github') as sync_mock, \
-             mock.patch.object(DeployKey, 'ensure') as ensure_deploy_key_mock:
+             mock.patch.object(DeployKey, 'ensure', side_effect=ensure_stub,
+                               autospec=True) as ensure_deploy_key_mock:
                 form_id = 'create-project-{}'.format(self.user_2_org_repo.gh_id)
                 r.forms[form_id].submit().follow()
         # The repository is private, make sure a deploy key was created
-        ensure_deploy_key_mock.assert_called_once_with()
+        ensure_deploy_key_mock.assert_called_once_with(mock.ANY)
         sync_mock.assert_called_once_with()
 
         assert self.user_2.owned_projects.count() == 1
