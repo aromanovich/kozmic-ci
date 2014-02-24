@@ -10,8 +10,8 @@ It is written in Python using Flask and Celery. It uses Docker for a job
 isolation and dependencies caching, MySQL as a data storage, Redis as a pub-sub
 implementation and uWSGI as a websockets framework.
 
-Why is Kozmic CI?
------------------
+Why Kozmic CI?
+--------------
 There are plenty of continuous integration tools out there and they all have
 pros and cons.
 
@@ -25,7 +25,7 @@ Kozmic CI is intended to be somewhere in between: to be easy to set up on your
 own server, configure and use, but flexible enough to be capable of performing
 any kind of job.
 
-And hey, it's Docker powered! Docker is cool! :)
+And hey, it is powered by Docker! `Docker`_ is cool! :)
 
 Basics
 ------
@@ -89,38 +89,36 @@ Kozmic CI runs builds in isolated Docker containers that offer a clean
 environment for every build.
 
 These containers are created using base images. A base image is a
-Docker image that meets a :ref:`few requirements <test-image-requirements>`.
-
-At this point Kozmic CI supports base images that are only hosted on
-a `Central Registry`_ provided by the Docker project.
-
-To tell Kozmic CI use particular base image for running a job, you must specify it's
-repository name in the hook settings. Repository names look like
-``<username>/<repo_name>``, i.e. ``kozmic/ubuntu-base``. You can also specify a tag
-from that repository, i.e. ``kozmic/ubuntu-base:12.04``.
-
-The specified base image will be pulled from the registry before
-running the first job.
-
-Kozmic CI provides a number of "official" base images: https://index.docker.io/u/kozmic/.
-They are all built using `Trusted Build`_ service and their `Dockerfiles are
-hosted on GitHub`_. If some of the base images is missing something,
-or you built a base image for your own needs and think that it may be
-useful for others -- please feel free to submit a pull request or open an issue.
-
-.. _test-image-requirements:
-
-Requirements
-~~~~~~~~~~~~
-Kozmic CI :term:`base image` must meet two requirements.
+Docker image that meets a few requirements:
 
 1. It must have the following packages installed:
   * ``bash``
   * ``sudo``
   * ``git``
   * ``openssh-client``
-2. It must have a user named ``kozmic`` with sudo rights without password check.
+2. It must have a user named ``kozmic`` with sudo rights without password check
 
+At this point Kozmic CI supports base images that are only hosted on
+a `Central Registry`_ provided by the Docker project.
+
+To tell Kozmic CI use particular base image for running a job, you must specify
+it's repository name in the hook settings. Repository names look like
+``<username>/<repo_name>``, i.e. ``kozmic/ubuntu-base``. You can also specify a
+tag from that repository, i.e. ``kozmic/ubuntu-base:12.04``.
+
+The specified base image will be pulled from the registry before
+running the first job.
+
+Kozmic CI provides a number of "official" base images:
+https://index.docker.io/u/kozmic/.  They are all built using `Trusted Build`_
+service and their `Dockerfiles are hosted on GitHub`_. If some of the base
+images is missing something, or you built a base image for your own needs and
+think that it may be useful for others -- please feel free to submit a pull
+request or open an issue.
+
+
+
+.. _Docker: https://www.docker.io/
 .. _Central Registry: https://index.docker.io/
 .. _Trusted Build: http://blog.docker.io/2013/11/introducing-trusted-builds/
 .. _Dockerfiles are hosted on GitHub: https://github.com/aromanovich/kozmic-images

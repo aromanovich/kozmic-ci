@@ -2,7 +2,6 @@
 
 Configuration
 =============
-
 An environment variable ``KOZMIC_CONFIG`` tells the application
 (:func:`kozmic.create_app` and :mod:`tailer`) which config to use. For example,
 to run a development server you can use the following command:
@@ -10,7 +9,6 @@ to run a development server you can use the following command:
 
 Variables
 ~~~~~~~~~
-
 .. setting:: SECRET_KEY
 ``SECRET_KEY``
     A secret string. Used for signing cookie-based sessions, as a passphrase
@@ -19,7 +17,7 @@ Variables
 .. setting:: SERVER_NAME
 ``SERVER_NAME``
     The name and port number of the server (e.g., ``'kozmic-ci.company.com'``
-    or ``'127.0.0.1:5000'``.
+    or ``'127.0.0.1:5000'``).
 
 .. setting:: SESSION_COOKIE_DOMAIN
 ``SESSION_COOKIE_DOMAIN``
@@ -34,11 +32,11 @@ Variables
 
 .. setting:: KOZMIC_GITHUB_CLIENT_ID
 ``KOZMIC_GITHUB_CLIENT_ID``
-    OAuth client id
+    GitHub OAuth app client id
 
 .. setting:: KOZMIC_GITHUB_CLIENT_SECRET
 ``KOZMIC_GITHUB_CLIENT_SECRET``
-    OAuth client secret
+    GitHub OAuth app client secret
 
 .. setting:: BROKER_URL
 ``BROKER_URL``
@@ -84,14 +82,14 @@ Variables
 
 .. setting:: SQLALCHEMY_DATABASE_URI
 ``SQLALCHEMY_DATABASE_URI``
-    SQLAlchemy connection string (e.g.,
-    ``'mysql+pymysql://user:password@127.0.0.1/kozmic'``);
+    SQLAlchemy connection string (default:
+    ``'mysql+pymysql://kozmic:@127.0.0.1/kozmic'``)
 
 .. setting:: TAILER_URL_TEMPLATE
 ``TAILER_URL_TEMPLATE``
     URL template to be used to get a websocket URL for a job.  Must point to a
     :mod:`tailer` application instance and contain ``job_id`` variable.  (e.g.,
-    ``'ws://kozmic-ci.company.com:8080/{job_id}/'``);
+    ``'ws://kozmic-ci.example.com:8080/{job_id}/'``);
 
 .. setting:: DOCKER_URL
 ``DOCKER_URL``

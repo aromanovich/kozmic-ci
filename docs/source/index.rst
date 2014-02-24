@@ -8,6 +8,10 @@ integrated with GitHub and powered by Docker.
    :maxdepth: 2
 
    overview
-   configuration
    installation
+   reference
+   configuration
    internals
+   contributing
+   changelog
+   contact

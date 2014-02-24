@@ -3,7 +3,7 @@
 kozmic.config
 ~~~~~~~~~~~~~
 
-Kozmic default configurations
+Kozmic default configuration
 """
 import os
 
