@@ -12,7 +12,7 @@
             <h4 class="list-group-item-heading">{{ project.gh_full_name }}</h4>
             Latest build:
             {% if latest_build %}
-              {{ render_status(latest_build.status, text=latest_build.created_at) }}
+              {{ render_status(latest_build.status, text=moment(latest_build.created_at).fromNow()) }}
             {% else %}
               never
             {% endif %}

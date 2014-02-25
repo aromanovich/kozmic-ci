@@ -19,6 +19,7 @@ from flask.ext.principal import Principal
 from flask.ext.assets import Environment, Bundle
 from flask.ext.wtf.csrf import CsrfProtect
 from flask.ext.mail import Mail
+from flask.ext.moment import Moment
 
 
 db = SQLAlchemy()
@@ -28,9 +29,10 @@ principal = Principal()
 celery = Celery()
 csrf = CsrfProtect()
 mail = Mail()
-docker = LocalProxy(
-    lambda: _docker.Client(base_url=flask.current_app.config['DOCKER_URL'],
-                           version=flask.current_app.config['DOCKER_API_VERSION']))
+moment = Moment()
+docker = LocalProxy(lambda: _docker.Client(
+    base_url=flask.current_app.config['DOCKER_URL'],
+    version=flask.current_app.config['DOCKER_API_VERSION']))
 
 
 def create_app(config=None):
@@ -41,7 +43,7 @@ def create_app(config=None):
                    If not specified, the value of ``KOZMIC_CONFIG``
                    environment variable will be used.
                    If ``KOZMIC_CONFIG`` is not specified,
-                   ``'kozmic.config.DefaultConfig'`` will be used. 
+                   ``'kozmic.config.DefaultConfig'`` will be used.
     """
     app = flask.Flask(__name__)
     config = config or os.environ.get('KOZMIC_CONFIG',
@@ -61,6 +63,7 @@ def configure_extensions(app):
     init_celery_app(app, celery)
     csrf.init_app(app)
     mail.init_app(app)
+    moment.init_app(app)
     assets = Environment(app)
     css = Bundle('css/bootstrap.css', output='gen/style.css')
     js = Bundle('js/bootstrap.js', output='gen/common.js')
@@ -97,6 +100,8 @@ def register_jinja2_globals_and_filters(app):
     ansi_converter = get_ansi_to_html_converter()
     app.jinja_env.filters['ansi2html'] = \
         lambda ansi: ansi_converter.convert(ansi, full=False)
+    app.jinja_env.filters['precise_moment'] = \
+        lambda dt: moment.create(dt).format('H:mm:ss, MMM DD')
     app.jinja_env.globals['render_ansi2html_style_tag'] = \
         ansi_converter.produce_headers
 

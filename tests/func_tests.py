@@ -172,7 +172,7 @@ class TestProjects(TestCase):
         """User can create a project from repository."""
         self.login(user_id=self.user_2.id)
 
-        r = self.w.get('/').maybe_follow().click('Repositories')
+        r = self.w.get('/').maybe_follow().click('New Project')
 
         def ensure_stub(self):
             self.gh_id = 123

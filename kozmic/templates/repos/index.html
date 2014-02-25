@@ -12,15 +12,16 @@
 
   <div class="well">
     <p>
-      This page lists GitHub repositories that you have administrative access to.<br>
-      You can create Kozmic project for any of them, if someone hasn't done it before.
+      This page lists GitHub repositories that you have administrative access to.
     </p>
     <a href="{{ url_for('.sync') }}" class="btn btn-default">
       <span class="glyphicon glyphicon-refresh"></span> Synchronize
     </a>
     <br>
     <small>
-      Last synchronized from GitHub: {{ current_user.repos_last_synchronized_at or 'never' }}.
+      Last synchronized with GitHub:
+      {{ current_user.repos_last_synchronized_at and
+         moment(current_user.repos_last_synchronized_at).fromNow() or 'never' }}.
     </small>
   </div>
 

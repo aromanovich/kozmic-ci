@@ -14,7 +14,7 @@
       <th>Commit SHA</th>
       <th class="commit-message">Commit message</th>
       <th>Started at</th>
-      <th>Finished at</th>
+      <th>Duration</th>
     </tr>
   </thead>
   <tbody>
@@ -35,8 +35,13 @@
           <a href="{{ build.get_github_com_commit_url() }}">{{ build.gh_commit_sha[:10] }}</a>
         </td>
         <td class="commit-message">{{ build.gh_commit_message }}</td>
-        <td>{{ build.started_at or '—' }}</td>
-        <td>{{ build.finished_at or '—' }}</td>
+        <td>
+          {{ build.started_at and build.started_at|precise_moment or '—' }}
+        </td>
+        <td>
+          {{ build.started_at and build.finished_at and
+             moment(build.finished_at).fromTime(build.started_at, no_suffix=True) or '—' }}
+        </td>
       </tr>
     {% endfor %}
   </tbody>

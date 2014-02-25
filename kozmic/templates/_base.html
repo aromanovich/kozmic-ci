@@ -7,6 +7,7 @@
     <script src="/static/js/libs/bootstrap.js"></script>
     <link rel="stylesheet" href="/static/css/bootstrap.css">
     <link rel="stylesheet" href="/static/css/styles.css">
+    {{ moment.include_moment() }}
     {% block extra_head %}
     {% endblock %}
   </head>
@@ -19,13 +20,13 @@
 
         <div class="navbar-collapse collapse">
           <ul class="nav navbar-nav navbar-right">
+            <li><a href="{{ url_for('repos.index') }}">New Project</a></li>
             <li class="dropdown">
               <a href="#" class="dropdown-toggle  username" data-toggle="dropdown">
                 <img src="{{ current_user.gh_avatar_url }}" class="img-circle">
                 &nbsp;{{ current_user.gh_name }} <b class="caret"></b>
               </a>
               <ul class="dropdown-menu">
-                <li><a href="{{ url_for('repos.index') }}">Repositories</a></li>
                 <li><a href="{{ url_for('accounts.settings') }}">Account settings</a></li>
                 <li class="divider"></li>
                 <li><a href="{{ url_for('auth.logout') }}">Sign out</a></li>

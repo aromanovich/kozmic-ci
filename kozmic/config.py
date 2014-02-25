@@ -54,6 +54,7 @@ class TestingConfig(DefaultConfig):
     SERVER_NAME = 'kozmic.test'
     KOZMIC_GITHUB_CLIENT_ID = ''
     KOZMIC_GITHUB_CLIENT_SECRET = ''
+    KOZMIC_ENABLE_EMAIL_NOTIFICATIONS = True
     # We need to specify LOGIN_DISABLED = False explicitly,
     # otherwise Flask-Login will turn off `login_required`
     # decorator because of TESTING variable:

@@ -8,9 +8,19 @@
 {% block job_content %}
   <dl class="dl-horizontal">
     <dt>Started at</dt>
-    <dd>{{ job.started_at }}</dd>
-    <dt>Finished at</dt>
-    <dd>{{ job.finished_at }}</dd>
+    <dd>{{ job.started_at and job.started_at|precise_moment or '—' }}</dd>
+    {% if job.finished_at %}
+      <dt>Finished at</dt>
+      <dd>{{ job.finished_at|precise_moment }}</dd>
+    {% endif %}
+    <dt>Duration</dt>
+    <dd>
+      {% if job.finished_at %}
+        {{ moment(job.finished_at).fromTime(job.started_at, no_suffix=True) }}
+      {% else %}
+        {{ moment(job.finished_at).fromNow(no_suffix=True, refresh=True) }}
+      {% endif %}
+    </dd>
     <dt>Return code</dt>
     <dd>{{ job.return_code }}</dd>
   </dl>

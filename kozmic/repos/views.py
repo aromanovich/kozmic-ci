@@ -2,7 +2,8 @@ import datetime
 import logging
 import collections
 
-from flask import current_app, flash, request, render_template, redirect, url_for, abort
+from flask import (current_app, flash, request, render_template, redirect,
+                   url_for, abort)
 from flask.ext.login import current_user
 
 from kozmic import db
@@ -32,9 +33,7 @@ def index():
 
     repositories_without_project = db.session.query(repositories).outerjoin(
         Project, repositories.c.gh_id == Project.gh_id
-    ).filter(
-        Project.id == None
-    ).all()
+    ).filter(Project.id == None).all()
 
     repositories_by_owner = collections.defaultdict(list)
     for gh_owner_login, gh_id, gh_full_name in repositories_without_project:
@@ -124,7 +123,7 @@ def on(gh_id):
 
     if ok_to_commit:
         db.session.commit()
-        return redirect(url_for('projects.index'))
+        return redirect(url_for('projects.settings', id=project.id))
     else:
         db.session.rollback()
         flash('Sorry, failed to create a project. Please try again later.',

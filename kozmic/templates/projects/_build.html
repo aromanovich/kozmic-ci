@@ -31,10 +31,14 @@
     <dd>{{ build.number }}</dd>
     <dt>Status</dt>
     <dd>{{ render_status(build.status) }}</dd>
-    <dt>Started at</dt>
-    <dd>{{ build.started_at or '—' }}</dd>
-    <dt>Finished at</dt>
-    <dd>{{ build.finished_at or '—' }}</dd>
+    {% if build.started_at %}
+      <dt>Started at</dt>
+      <dd>{{ build.started_at|precise_moment }}</dd>
+    {% endif %}
+    {% if build.finished_at %}
+      <dt>Finished at</dt>
+      <dd>{{ build.finished_at|precise_moment }}</dd>
+    {% endif %}
     <dt>Author</dt>
     <dd>{{ build.gh_commit_author }}</dd>
     <dt>Commit message</dt>
