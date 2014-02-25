@@ -22,6 +22,12 @@ from flask.ext.mail import Mail
 from flask.ext.moment import Moment
 
 
+VERSION = '0.1.0'
+
+def get_version():
+    return VERSION
+
+
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
@@ -95,6 +101,7 @@ def configure_blueprints(app):
 def register_jinja2_globals_and_filters(app):
     import wtforms
     from kozmic.builds import get_ansi_to_html_converter
+    app.jinja_env.globals['get_version'] = get_version
     app.jinja_env.globals['bootstrap_is_hidden_field'] = \
         lambda field: isinstance(field, wtforms.HiddenField)
     ansi_converter = get_ansi_to_html_converter()

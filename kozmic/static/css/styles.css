@@ -38,6 +38,16 @@ body {
   height: 38px;
 }
 
+footer {
+  margin-top: 30px;
+  color: #888;
+  font-size: 13px;
+}
+
+footer .pull-right {
+  text-align: right;
+}
+
 .job-actions {
   margin-bottom: 5px;
 }
