@@ -31,7 +31,7 @@ def clean_dependencies_cache(verbose=True):
             except ValueError:
                 continue
 
-            images_by_projects[project_id].append((created_at, repository))
+            images_by_projects[project_id].append((created_at, image_data['Id']))
             break
 
     for project_id, timestamped_images in images_by_projects.iteritems():

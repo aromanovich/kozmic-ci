@@ -875,17 +875,17 @@ class TestCommands(TestCase):
     def test_clean_dependencies_cache(self, docker_mock):
         i = 'kozmic-cache/{}:{}'.format
         docker_mock.images.return_value = [
-            {'RepoTags': [i('a1', '1')], 'Created': 1389658801},
-            {'RepoTags': [i('b1', '1')], 'Created': 1389658800},
-            {'RepoTags': [i('c1', '1')], 'Created': 1389658805},
-            {'RepoTags': [i('d1', '1')], 'Created': 1389658806},
-            {'RepoTags': [i('e1', '1')], 'Created': 1389650000},
-            {'RepoTags': [i('a2', '2')], 'Created': 1389658212},
+            {'RepoTags': [i('a1', '1')], 'Created': 1389658801, 'Id': 'id-a1'},
+            {'RepoTags': [i('b1', '1')], 'Created': 1389658800, 'Id': 'id-b1'},
+            {'RepoTags': [i('c1', '1')], 'Created': 1389658805, 'Id': 'id-c1'},
+            {'RepoTags': [i('d1', '1')], 'Created': 1389658806, 'Id': 'id-d1'},
+            {'RepoTags': [i('e1', '1')], 'Created': 1389650000, 'Id': 'id-e1'},
+            {'RepoTags': [i('a2', '2')], 'Created': 1389658212, 'Id': 'id-a2'},
         ]
         kozmic.builds.commands.clean_dependencies_cache()
         assert docker_mock.remove_image.call_args_list == [
-            mock.call('kozmic-cache/e1'),
-            mock.call('kozmic-cache/b1'),
+            mock.call('id-e1'),
+            mock.call('id-b1'),
         ]
 
 
