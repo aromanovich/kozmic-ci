@@ -104,9 +104,21 @@ footer .pull-right {
   color: #5cb85c;
 }
 
+.build-history .label {
+  display: inline-block;
+  font-size: 12px;
+  padding: 5px 10px;
+
+}
+
 .build-history.table th.commit-message,
 .build-history.table td.commit-message {
-  max-width: 200px;
+  max-width: 300px;
+}
+
+.build-history.table td.commit-message a {
+  display: block;
+  color: #333;
 }
 
 .project-name {

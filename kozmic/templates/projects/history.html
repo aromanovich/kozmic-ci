@@ -9,40 +9,41 @@
   <thead>
     <tr>
       <th>#</th>
-      <th>Status</th>
-      <th></th>
-      <th>Commit SHA</th>
-      <th class="commit-message">Commit message</th>
-      <th>Started at</th>
+      <th class="commit-message">Message</th>
+      <th>Commit</th>
       <th>Duration</th>
+      <th>Finished</th>
     </tr>
   </thead>
   <tbody>
     {% for build in builds %}
-      <tr>
-        <td>
-          <a href="{{ url_for('.build', project_id=project.id, id=build.id) }}">
-            {{ build.number }}
-          </a>
-        </td>
-        <td>{{ render_status(build.status) }}</td>
-        <td>
-          <a href="{{ url_for('.build', project_id=project.id, id=build.id) }}" class="btn btn-default">
-            Show
-          </a>
-        </td>
-        <td>
-          <a href="{{ build.get_github_com_commit_url() }}">{{ build.gh_commit_sha[:10] }}</a>
-        </td>
-        <td class="commit-message">{{ build.gh_commit_message }}</td>
-        <td>
-          {{ build.started_at and build.started_at|precise_moment or '—' }}
-        </td>
-        <td>
-          {{ build.started_at and build.finished_at and
-             moment(build.finished_at).fromTime(build.started_at, no_suffix=True) or '—' }}
-        </td>
-      </tr>
+      {% with build_url=url_for('.build', project_id=project.id, id=build.id) %}
+        <tr>
+          <td class="build-id">
+            <a href="{{ build_url }}">
+              {{ render_status(build.status, text=build.number) }}
+            </a>
+          </td>
+          <td class="commit-message">
+            <a href="{{ build_url }}">
+              {{ build.gh_commit_message }}
+            </a>
+          </td>
+          <td>
+            <a href="{{ build.get_github_com_commit_url() }}">
+              {{ build.gh_commit_sha[:7] }}
+              ({{ build.gh_commit_ref }})
+            </a>
+          </td>
+          <td>
+            {{ build.started_at and build.finished_at and
+               moment(build.finished_at).fromTime(build.started_at, no_suffix=True) or '—' }}
+          </td>
+          <td>
+            {{ build.finished_at and moment(build.finished_at).fromNow() or '—' }}
+          </td>
+        </tr>
+      {% endwith %}
     {% endfor %}
   </tbody>
 </table>
