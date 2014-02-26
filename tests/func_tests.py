@@ -277,7 +277,6 @@ class TestHooksManagement(TestCase):
         assert 'Hooks haven\'t been configured yet.' not in settings_page
         for hook in hooks:
             assert hook.title in settings_page
-            assert hook.build_script in settings_page
 
     def test_manager_can_add_hook(self):
         """Manager can add a project hook."""

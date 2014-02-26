@@ -414,7 +414,8 @@ class Project(db.Model):
         db.session.delete(self)
 
         rv = True
-        rv &= self.deploy_key.delete()
+        if not self.is_public:
+            rv &= self.deploy_key.delete()
         for hook in self.hooks:
             rv &= hook.delete()
             if not rv:
