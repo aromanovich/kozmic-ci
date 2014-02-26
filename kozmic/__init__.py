@@ -71,8 +71,18 @@ def configure_extensions(app):
     mail.init_app(app)
     moment.init_app(app)
     assets = Environment(app)
-    css = Bundle('css/bootstrap.css', output='gen/style.css')
-    js = Bundle('js/bootstrap.js', output='gen/common.js')
+    css = Bundle(
+        'css/libs/bootstrap.css',
+        'css/libs/codemirror.css',
+        'css/styles.css',
+        output='gen/style.css')
+    js = Bundle(
+        'js/libs/jquery.js',
+        'js/libs/bootstrap.js',
+        'js/libs/codemirror.js',
+        'js/tailer.js',
+        'js/hook-form.js',
+        output='gen/common.js')
     assets.register('css', css)
     assets.register('js', js)
 

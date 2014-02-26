@@ -2,12 +2,6 @@
 
 {% from 'projects/_hook_form.html' import hook_form %}
 
-{% block extra_head %}
-  <script src="/static/js/libs/codemirror.js"></script>
-  <script src="/static/js/hook-form.js"></script>
-  <link rel="stylesheet" href="/static/css/codemirror.css">
-{% endblock %}
-
 {% block content %}
   <h4>Edit hook</h4>
   {{ hook_form(form) }}

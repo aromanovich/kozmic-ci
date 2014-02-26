@@ -3,10 +3,12 @@
   <head>
     <meta charset="utf-8">
     <title>Kozmic CI</title>
-    <script src="/static/js/libs/jquery.js"></script>
-    <script src="/static/js/libs/bootstrap.js"></script>
-    <link rel="stylesheet" href="/static/css/bootstrap.css">
-    <link rel="stylesheet" href="/static/css/styles.css">
+    {% assets 'js' -%}
+      <script src="{{ ASSET_URL }}"></script>
+    {% endassets %}
+    {% assets 'css' -%}
+      <link rel="stylesheet" href="{{ ASSET_URL }}">
+    {% endassets %}
     {{ moment.include_moment() }}
     {% block extra_head %}
     {% endblock %}

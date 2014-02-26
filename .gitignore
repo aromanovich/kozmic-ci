@@ -1,4 +1,8 @@
 .coverage
+
 kozmic/config_local.py
+kozmic/static/.webassets-cache
+kozmic/static/gen
+
 docs/build
 misc
