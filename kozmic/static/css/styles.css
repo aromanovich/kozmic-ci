@@ -125,6 +125,15 @@ footer .pull-right {
   margin-top: 0;
 }
 
+.hook.list-group-item {
+  height: 56px;
+}
+
+.hook.list-group-item .delete-form {
+  display: inline;
+  margin-left: 10px;
+}
+
 #install_script, #build_script {
   height: 130px;
   font-family: monospace;

@@ -8,23 +8,11 @@
   {% if project.hooks.first() %}
     <div class="list-group">
       {% for hook in project.hooks %}
-        <div class="list-group-item">
-          <h4>{{ hook.title }}</h4>
-          <dl>
-            <dt>Docker image</dt>
-            <dd>{{ hook.docker_image }}</dd>
-            <dt>Build script</dt>
-            <dd><pre>{{ hook.build_script }}</pre></dd>
-          </dl>
+        <div class="hook  list-group-item">
+          {{ hook.title }}
 
           {% if is_current_user_a_manager %}
-            <a class="btn btn-default" id="edit-hook-{{ hook.id }}"
-               href="{{ url_for('.edit_hook', project_id=project.id,
-                                hook_id=hook.id) }}">
-              <span class="glyphicon glyphicon-edit"></span> Edit
-            </a>
-
-            <form method="POST" style="display: inline;"
+            <form method="POST" class="delete-form  pull-right"
                   action="{{ url_for('.delete_hook', project_id=project.id, hook_id=hook.id) }}"
                   id="delete-hook-{{ hook.id }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -32,6 +20,11 @@
                 <span class="glyphicon glyphicon-remove-sign"></span> Delete
               </button>
             </form>
+
+            <a class="btn btn-default pull-right" id="edit-hook-{{ hook.id }}"
+               href="{{ url_for('.edit_hook', project_id=project.id, hook_id=hook.id) }}">
+              <span class="glyphicon glyphicon-edit"></span> Edit
+            </a>
           {% endif %}
         </div>
       {% endfor %}

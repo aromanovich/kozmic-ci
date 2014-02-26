@@ -545,12 +545,12 @@ class Hook(db.Model):
         """
         db.session.delete(self)
 
-        gh_hook = self.project.gh.hook(self.gh_id)
-        if not gh_hook:
-            # Probably it was deleted manually using GitHub interface, it's OK
-            return True
-
         try:
+            gh_hook = self.project.gh.hook(self.gh_id)
+            if not gh_hook:
+                # Probably it was deleted manually using GitHub interface, it's OK
+                return True
+
             gh_hook.delete()
         except github3.GitHubError as exc:
             logger.warning(
