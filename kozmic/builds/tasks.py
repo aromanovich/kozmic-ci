@@ -28,8 +28,8 @@ from docker import APIError as DockerAPIError
 
 from kozmic import db, celery, docker
 from kozmic.models import Build, Job, HookCall
+from kozmic.docker_utils import does_docker_image_exist
 from . import get_ansi_to_html_converter
-from .utils import does_docker_image_exist
 
 
 logger = get_task_logger(__name__)

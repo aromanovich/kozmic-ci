@@ -21,8 +21,7 @@ from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
 import kozmic.builds.views
-import kozmic.builds.utils
-from kozmic import mail, docker
+from kozmic import mail, docker, docker_utils
 from kozmic.models import (db, DeployKey, Project, Membership, User, Hook,
                            HookCall, Job, Build, TrackedFile)
 from . import TestCase, factories, func_fixtures, utils, unit_fixtures as fixtures
@@ -447,7 +446,7 @@ class TestDeployKeyDB(TestCase):
 
             assert not gh_mock.key.called
             gh_mock.create_key.assert_called_once_with(
-                'Kozmic CI key', deploy_key.rsa_public_key) 
+                'Kozmic CI key', deploy_key.rsa_public_key)
             assert deploy_key.gh_id == 123
 
     @mock.patch.object(Project, 'gh')
@@ -787,8 +786,10 @@ class TestJobDB(TestCase):
         self.job = factories.JobFactory.create(
             build=self.build, hook_call=self.hook_call)
 
+    @mock.patch('kozmic.docker_utils.get_docker_image_id', return_value=u'id-1')
     @mock.patch.object(Project, 'gh')
-    def test_get_cache_id_changes_when_tracked_file_changes(self, gh_mock):
+    def test_get_cache_id_changes_when_tracked_file_changes(
+            self, gh_mock, get_image_id_mock):
         self.hook.tracked_files.delete()
         self.hook.tracked_files.extend([
             TrackedFile(path='./a/../b/../install.sh'),
@@ -847,8 +848,10 @@ class TestJobDB(TestCase):
         cache_id = self.job.get_cache_id()
         assert cache_id in seen_cache_ids
 
+    @mock.patch('kozmic.docker_utils.get_docker_image_id', return_value='id-1')
     @mock.patch.object(Project, 'gh')
-    def test_get_cache_id_changes_when_image_or_script_changes(self, _):
+    def test_get_cache_id_changes_when__script_changes(
+            self, gh_mock, get_image_id_mock):
         seen_cache_ids = set()
 
         self.hook.install_script = ('#!/bin/bash\n'
@@ -864,10 +867,25 @@ class TestJobDB(TestCase):
         assert cache_id not in seen_cache_ids
         seen_cache_ids.add(cache_id)
 
-        self.hook.docker_image = 'kozmic/debian'
+    @mock.patch('kozmic.docker_utils.get_docker_image_id', return_value='id-1')
+    @mock.patch.object(Project, 'gh')
+    def test_get_cache_id_changes_when_image_changes(
+            self, gh_mock, get_image_id_mock):
+        seen_cache_ids = set()
+
         cache_id = self.job.get_cache_id()
         assert cache_id not in seen_cache_ids
         seen_cache_ids.add(cache_id)
+
+        # Change docker_image name and make sure that cache_id is not changed
+        self.hook.docker_image = 'kozmic/debian'
+        cache_id = self.job.get_cache_id()
+        assert cache_id in seen_cache_ids
+
+        get_image_id_mock.return_value = 'id-2'
+        # Change docker_image id and make sure that cache_id is changed
+        cache_id = self.job.get_cache_id()
+        assert cache_id not in seen_cache_ids
 
 
 class TestCommands(TestCase):
@@ -917,7 +935,7 @@ class TestUtils(TestCase):
             }
         ]
 
-        assert kozmic.builds.utils.does_docker_image_exist('ubuntu', tag='12.04')
-        assert kozmic.builds.utils.does_docker_image_exist('ubuntu')
-        assert not kozmic.builds.utils.does_docker_image_exist('ubuntu', tag='qwerty')
-        assert not kozmic.builds.utils.does_docker_image_exist('debian')
+        assert docker_utils.does_docker_image_exist('ubuntu', tag='12.04')
+        assert docker_utils.does_docker_image_exist('ubuntu')
+        assert not docker_utils.does_docker_image_exist('ubuntu', tag='qwerty')
+        assert not docker_utils.does_docker_image_exist('debian')

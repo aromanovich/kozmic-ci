@@ -9,7 +9,6 @@ import pytest
 from flask.ext.webtest import SessionScope
 
 import kozmic.builds.tasks
-import kozmic.builds.utils
 from kozmic import docker
 from kozmic.models import Project, DeployKey, Build, Job, TrackedFile
 from . import TestCase, factories, utils

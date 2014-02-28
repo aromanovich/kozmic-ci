@@ -20,7 +20,7 @@ from flask.ext.mail import Message
 from werkzeug.utils import cached_property
 from sqlalchemy.ext.declarative import declared_attr
 
-from . import db, mail, perms
+from . import db, mail, perms, docker_utils
 from .utils import JSONEncodedDict
 
 
@@ -740,12 +740,21 @@ class Job(db.Model):
         built from the install script.
         A cache id changes whenever the base Docker image, the install
         script or any of the :term:`tracked files` is changed.
+
+        .. note::
+
+            Requires that Docker is running and Docker base image
+            (:attr:`self.hook_call.hook.docker_image`) is pulled.
         """
         hook = self.hook_call.hook
         gh = self.build.project.gh
         commit_sha = self.build.gh_commit_sha
 
-        hash_parts = [hook.docker_image, hook.install_script]
+        docker_image_id = docker_utils.get_docker_image_id(
+            *hook.docker_image.rsplit(':'))
+        assert docker_image_id
+        hash_parts = [docker_image_id, hook.install_script]
+
         for tracked_file in hook.tracked_files.order_by(TrackedFile.path):
             path = tracked_file.path
             # GitHub API wants to see paths relative to the repo directory
