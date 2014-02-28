@@ -29,17 +29,6 @@
         </div>
       {% endfor %}
     </div>
-
-    {% if is_current_user_a_manager %}
-      <form action="{{ url_for('.ensure_hooks', project_id=project.id) }}"
-            method="POST" id="ensure-hooks">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <small>If you have manually deleted (or corrupted) some of the hooks on GitHub, you can</small>
-        <button type="submit" class="btn btn-sm btn-default">
-          restore their configuration
-        </button>.
-      </form>
-    {% endif %}
   {% else %}
     <p>Hooks haven't been configured yet.</p>
   {% endif %}
@@ -49,10 +38,19 @@
       <span class="glyphicon glyphicon-plus-sign"></span>
       Add a new hook
     </a>
+
+    <form action="{{ url_for('.ensure_hooks', project_id=project.id) }}"
+          method="POST" id="ensure-hooks">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-default"
+              data-toggle="tooltip" data-placement="top"
+              title="In case if some of the GitHub hooks were deleted or corrupted">
+        <span class="glyphicon glyphicon-upload"></span>
+        Restore hooks on GitHub
+      </button>
+    </form>
   {% endif %}
   
-  <hr>
-
   <h3>GitHub badge</h3>
   <p>
     You can use the status buttons to show the current status of your project.
@@ -60,8 +58,6 @@
   &lt;img src="{{ example_badge_src }}" height="18"&gt;
 &lt;/a&gt;</code></pre>
   </p>
-
-  <hr>
 
   <h3>Members</h3>
 
@@ -108,8 +104,12 @@
     <form id="delete-project" method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-danger">
-        <span class="glyphicon glyphicon-remove-sign"></span> Delete project
+        <span class="glyphicon glyphicon-remove-sign"></span> Delete Project
       </button>
     </form>
   {% endif %}
+{% endblock %}
+
+{% block onload_js %}
+  $('#ensure-hooks button').tooltip();
 {% endblock %}

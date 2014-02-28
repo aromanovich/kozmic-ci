@@ -1,8 +1,12 @@
-{% extends 'projects/settings.html' %}
+{% extends 'projects/_base.html' %}
 
 {% from 'projects/_hook_form.html' import hook_form %}
 
+{% set active_tab = 'add-hook' %}
+{% set extra_tabs = [
+  ('', 'add-hook', 'Add Hook'),
+] -%}
+
 {% block content %}
-  <h4>Add hook</h4>
   {{ hook_form(form) }}
 {% endblock %}

@@ -3,13 +3,9 @@
   <head>
     <meta charset="utf-8">
     <title>Kozmic CI</title>
-    {% assets 'js' -%}
-      <script src="{{ ASSET_URL }}"></script>
-    {% endassets %}
     {% assets 'css' -%}
       <link rel="stylesheet" href="{{ ASSET_URL }}">
     {% endassets %}
-    {{ moment.include_moment() }}
     {% block extra_head %}
     {% endblock %}
   </head>
@@ -45,10 +41,10 @@
         <footer>
           <p class="pull-left">
             Kozmic CI {{ get_version() }}<br>
-            &copy; Copyright 2014, Anton Romanovich.
+            &copy; 2014, Anton Romanovich.
           </p>
           <p class="pull-right">
-            Kozmic CI is Open Source Software.
+            Kozmic CI is open source software.
             <a class="btn btn-default btn-sm" href="https://github.com/aromanovich/kozmic-ci">
               Contribute
             </a>
@@ -56,5 +52,14 @@
         </footer>
       </div>
     {% endblock %}
+    {% assets 'js' -%}
+      <script src="{{ ASSET_URL }}"></script>
+    {% endassets %}
+    {{ moment.include_moment() }}
+    <script>
+      $(function() {
+        {% block onload_js %}{% endblock %}
+      });
+    </script>
   </body>
 </html>

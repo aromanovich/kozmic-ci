@@ -78,8 +78,8 @@ def configure_extensions(app):
         output='gen/style.css')
     js = Bundle(
         'js/libs/jquery.js',
-        'js/libs/bootstrap.js',
         'js/libs/codemirror.js',
+        'js/libs/bootstrap.js',
         'js/tailer.js',
         'js/hook-form.js',
         output='gen/common.js')

@@ -156,6 +156,20 @@ form#ensure-hooks {
   border-color: #b94a48;
 }
 
+#hook-form {
+  margin-top: 15px;
+}
+
 #hook-form .help-block {
   font-size: 13px;
+}
+
+form#sync-user-memberships .btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+form#ensure-hooks {
+  display: inline;
 }
