@@ -1,5 +1,5 @@
 body {
-  padding: 30px;
+  padding-bottom: 10px;
 }
 
 #splash #sign-up {
@@ -24,7 +24,6 @@ body {
 }
 
 #topbar {
-  margin-bottom: 30px;
   background: url('/static/img/milky-way-galaxy.jpg');
   background-position: 0 210px;
 }
@@ -127,6 +126,7 @@ footer .pull-right {
 
 .hook.list-group-item {
   height: 56px;
+  line-height: 34px;
 }
 
 .hook.list-group-item .delete-form {
@@ -150,6 +150,12 @@ form#ensure-hooks {
 
 .CodeMirror {
   border: 1px solid #ccc;
+  height: auto;
+}
+
+.CodeMirror-scroll {
+  overflow-y: hidden;
+  overflow-x: auto;
 }
 
 .has-error .CodeMirror {
@@ -172,4 +178,12 @@ form#sync-user-memberships .btn {
 
 form#ensure-hooks {
   display: inline;
+}
+
+dl {
+  margin-top: 20px;
+}
+
+.list-group.projects .selected {
+  background: #f5f5f5;
 }

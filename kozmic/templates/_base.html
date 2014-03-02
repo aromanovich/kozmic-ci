@@ -11,28 +11,30 @@
   </head>
   <body>
     {% block body %}
-      <nav class="navbar navbar-inverse" id="topbar" role="navigation">
-        <div class="navbar-header">
-          <a class="navbar-brand" href="{{ url_for('projects.index') }}">Kozmic CI &alpha;</a>
-        </div>
+      <nav class="navbar navbar-inverse navbar-static-top" id="topbar">
+        <div class="container">
+          <div class="navbar-header">
+            <a class="navbar-brand" href="{{ url_for('projects.index') }}">Kozmic CI</a>
+          </div>
 
-        <div class="navbar-collapse collapse">
-          <ul class="nav navbar-nav navbar-right">
-            <li><a href="{{ url_for('repos.index') }}">New Project</a></li>
-            {# TODO The link to docs must contain the current Kozmic CI version #}
-            <li><a href="http://kozmic-ci.readthedocs.org/en/latest/">Docs</a></li>
-            <li class="dropdown">
-              <a href="#" class="dropdown-toggle  username" data-toggle="dropdown">
-                <img src="{{ current_user.gh_avatar_url }}" class="img-circle">
-                &nbsp;{{ current_user.gh_name }} <b class="caret"></b>
-              </a>
-              <ul class="dropdown-menu">
-                <li><a href="{{ url_for('accounts.settings') }}">Account settings</a></li>
-                <li class="divider"></li>
-                <li><a href="{{ url_for('auth.logout') }}">Sign out</a></li>
-              </ul>
-            </li>
-          </ul>
+          <div class="navbar-collapse collapse">
+            <ul class="nav navbar-nav navbar-right">
+              <li><a href="{{ url_for('repos.index') }}">New Project</a></li>
+              {# TODO The link to docs must contain the current Kozmic CI version #}
+              <li><a href="http://kozmic-ci.readthedocs.org/en/latest/">Docs</a></li>
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle  username" data-toggle="dropdown">
+                  <img src="{{ current_user.gh_avatar_url }}" class="img-circle">
+                  &nbsp;{{ current_user.gh_name }} <b class="caret"></b>
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a href="{{ url_for('accounts.settings') }}">Account settings</a></li>
+                  <li class="divider"></li>
+                  <li><a href="{{ url_for('auth.logout') }}">Sign out</a></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
         </div>
       </nav>
       <div class="container">

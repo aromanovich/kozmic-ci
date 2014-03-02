@@ -38,20 +38,22 @@
       <span class="glyphicon glyphicon-plus-sign"></span>
       Add a new hook
     </a>
-
-    <form action="{{ url_for('.ensure_hooks', project_id=project.id) }}"
-          method="POST" id="ensure-hooks">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn btn-default"
-              data-toggle="tooltip" data-placement="top"
-              title="In case if some of the GitHub hooks were deleted or corrupted">
-        <span class="glyphicon glyphicon-upload"></span>
-        Restore hooks on GitHub
-      </button>
-    </form>
+    
+    {% if project.hooks.first() %}
+      <form action="{{ url_for('.ensure_hooks', project_id=project.id) }}"
+            method="POST" id="ensure-hooks">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-default"
+                data-toggle="tooltip" data-placement="top"
+                title="In case if some of the GitHub hooks were deleted or corrupted">
+          <span class="glyphicon glyphicon-upload"></span>
+          Restore hooks on GitHub
+        </button>
+      </form>
+    {% endif %}
   {% endif %}
   
-  <h3>GitHub badge</h3>
+  <h3>Badge</h3>
   <p>
     You can use the status buttons to show the current status of your project.
     <pre><code>&lt;a href="{{ example_badge_href }}"&gt;
@@ -80,7 +82,7 @@
           method="POST" id="sync-project-memberships">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-default">
-        <span class="glyphicon glyphicon-refresh"></span> Synchronize members with GitHub
+        <span class="glyphicon glyphicon-refresh"></span> Sync members with GitHub
       </button>
     </form>
   {% endif %}
@@ -88,23 +90,10 @@
   {% if can_current_user_delete_a_project -%}
     <hr>
 
-    <script>
-      var deleteProjectURL = '{{ url_for('.delete_project', id=project.id) }}';
-      $(function() {
-        $('#delete-project').attr('action', deleteProjectURL);
-        $('#delete-project').submit(function() {
-          var text = prompt('This will irrevocably destroy all project data. ' +
-                            'If you do want to continue, please type a full GitHub name ' +
-                            'of the project.');
-          return (text === '{{ project.gh_full_name }}');
-        });
-      });
-    </script>
-
     <form id="delete-project" method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-danger">
-        <span class="glyphicon glyphicon-remove-sign"></span> Delete Project
+        <span class="glyphicon glyphicon-remove-sign"></span> Delete this project
       </button>
     </form>
   {% endif %}
@@ -112,4 +101,11 @@
 
 {% block onload_js %}
   $('#ensure-hooks button').tooltip();
+  var deleteProjectURL = '{{ url_for('.delete_project', id=project.id) }}';
+  $('#delete-project').attr('action', deleteProjectURL).submit(function() {
+    var text = prompt('This will irrevocably destroy all project data. ' +
+                      'If you do want to continue, please type a full GitHub name ' +
+                      'of the project.');
+    return (text === '{{ project.gh_full_name }}');
+  });
 {% endblock %}

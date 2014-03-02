@@ -4,6 +4,5 @@ $(function () {
             mode: 'shell',
             lineNumbers: true
         });
-        cm.setSize(null, 200);
     });
 });

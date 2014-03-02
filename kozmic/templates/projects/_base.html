@@ -5,11 +5,12 @@
 {% block container %}
   <div class="row">
     <div class="col-md-3">
-      <div class="list-group">
-        {% for project, latest_build in
+      <div class="list-group  projects">
+        {% for project_, latest_build in
             current_user.get_available_projects(annotate_with_latest_builds=True) %}
-          <a href="{{ url_for('.show', id=project.id) }}" class="list-group-item">
-            <h4 class="list-group-item-heading">{{ project.gh_full_name }}</h4>
+            <a href="{{ url_for('.show', id=project_.id) }}"
+               class="list-group-item{% if project_ == project %} selected{% endif %}">
+            <h4 class="list-group-item-heading">{{ project_.gh_full_name }}</h4>
             {% if latest_build %}
               {{ render_status(latest_build.status, text=moment(latest_build.created_at).fromNow()) }}
             {% endif %}

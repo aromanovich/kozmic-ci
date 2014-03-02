@@ -35,9 +35,12 @@
           {{ show_errors(field) }}
         {% else %}
           <p class="help-block">
-            Install build dependencies here.<br>
             It will be run as an executable, so do not forget to put
             a shebang directive at the beginning.
+          </p>
+          <p class="help-block">
+            See <a href="http://kozmic-ci.readthedocs.org/en/latest/reference.html">the documentation</a>
+            about hook configuration.
           </p>
         {% endif %}
       </div>
@@ -58,7 +61,7 @@
             Results of the install script are cached. The cache is invalidated
             whenever the base Docker image, the install script or any of the
             tracked files change. Remember to list here all the files used by
-            install script (such as pip's requirements.txt, Gemfile, etc).
+            the install script (such as pip's requirements.txt, Gemfile, etc).
           </p>
         {% endif %}
       </div>
