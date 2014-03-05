@@ -27,6 +27,25 @@ any kind of job.
 
 And hey, it is powered by Docker! `Docker`_ is cool! :)
 
+Kozmic CI Philosophy
+--------------------
+Kozmic CI is made with simplicity in mind.
+
+It doesn't do much by itself. It delegates job isolation and dependencies
+caching to Docker. It uses GitHub as an authentication and authorization
+provider. It doesn’t maintain any VM images with pre-installed languages and
+databases. It doesn’t even introduce a build configuration format.
+
+You are free to use your favorite scripting language to describe a build.
+You'll probably have to learn some Bash while writing build scripts, but in
+return you'll be given control, predictability and ease of debugging.
+
+The lack of "official" images with pre-installed stuff is a deliberate choice.
+You have to set up the environment yourself --- it encourages you to keep your
+testing environment close to the production one and pin your requirements. And
+then you'll not one day be surprised by a broken build when the official VM
+image is upgraded.
+
 Basics
 ------
 Kozmic CI is tightly integrated with GitHub.
@@ -92,10 +111,12 @@ These containers are created using base images. A base image is a
 Docker image that meets a few requirements:
 
 1. It must have the following packages installed:
+
   * ``bash``
   * ``sudo``
   * ``git``
   * ``openssh-client``
+
 2. It must have a user named ``kozmic`` with sudo rights without password check
 
 At this point Kozmic CI supports base images that are only hosted on
