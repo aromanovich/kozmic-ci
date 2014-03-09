@@ -17,13 +17,14 @@ RUN pip install -r /src/requirements/tailer.txt
 
 ADD https://get.docker.io/builds/Linux/x86_64/docker-latest /bin/docker
 ADD ./files/rsyslog.conf /etc/rsyslog.d/50-default.conf
+ADD ./files/rsyslog-logrotate /etc/logrotate.d/rsyslog
 ADD ./files/supervisor.conf /etc/supervisor.conf
 ADD ./files/kozmic-uwsgi.ini /etc/kozmic-uwsgi.ini
 ADD ./files/tailer-uwsgi.ini /etc/tailer-uwsgi.ini
 ADD ./files/wrapped-docker /bin/wrapped-docker
-ADD ./files/run.sh /run.sh
 ADD ./files/crontab /etc/crontab
 ADD ./files/config.py-docker /config.py-docker
+ADD ./files/run.sh /run.sh
 RUN chmod +x /bin/wrapped-docker /bin/docker /run.sh && \
     chown root /etc/crontab && \
     chmod 644 /etc/crontab
