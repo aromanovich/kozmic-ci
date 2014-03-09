@@ -14,6 +14,7 @@ config="$config\n    SESSION_COOKIE_DOMAIN = '$SERVER_NAME'"
 config="$config\n    TAILER_URL_TEMPLATE = 'ws://$SERVER_NAME:8080/{job_id}/'"
 echo -e "$config" > ./kozmic/config_local.py
 
+mkdir -p /var/log/mysql
 mysql_install_db
 
 echo "Starting MySQL server..."

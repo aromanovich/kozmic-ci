@@ -47,15 +47,16 @@ Create a data-only container that will be used to persist the Kozmic CI data::
 
 Run Kozmic CI::
 
-    docker run -e=SECRET_KEY=123
-               -e=GITHUB_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx \
-               -e=GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
-               -e=SERVER_NAME=192.168.33.210 \
-               -p=80:80 \
-               -p=8080:8080 \
-               -volumes-from kozmic-data \
-               -v=$HOME/kozmic-ci/log:/var/log \
-               -privileged aromanovich/kozmic
+    JOB=$(docker run -e=SECRET_KEY=xxxxx \
+                     -e=GITHUB_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx \
+                     -e=GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+                     -e=SERVER_NAME=xxx.xxx.xxx.xxx \
+                     -p=80:80 \
+                     -p=8080:8080 \
+                     -volumes-from kozmic-data \
+                     -v=$HOME/kozmic-ci/log:/var/log \
+                     -privileged -d aromanovich/kozmic)
+    docker logs $JOB
 
 A few comments:
 

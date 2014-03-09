@@ -6,6 +6,7 @@ kozmic
 .. autofunction:: create_app
 """
 import os
+import logging
 
 import docker as _docker
 import flask
@@ -23,6 +24,7 @@ from flask.ext.moment import Moment
 
 
 VERSION = '0.1.0'
+
 
 def get_version():
     return VERSION
@@ -55,10 +57,18 @@ def create_app(config=None):
     config = config or os.environ.get('KOZMIC_CONFIG',
                                       'kozmic.config.DefaultConfig')
     app.config.from_object(config)
+    configure_logging(app)
     configure_extensions(app)
     configure_blueprints(app)
     register_jinja2_globals_and_filters(app)
     return app
+
+
+def configure_logging(app):
+    app.logger.setLevel(logging.INFO)
+    if not app.debug:
+        handler = logging.StreamHandler()
+        app.logger.addHandler(handler)
 
 
 def configure_extensions(app):
