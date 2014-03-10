@@ -14,19 +14,23 @@ def get_ref_and_sha(payload):
 
     if action is None:
         # See `tests.func_fixtures.PUSH_HOOK_CALL_DATA` for payload
-        ref = payload['ref']  # ref looks like "refs/heads/master"
-        if not ref.startswith('refs/heads/'):
+        ref = payload.get('ref')  # ref looks like "refs/heads/master"
+        if not ref or not ref.startswith('refs/heads/'):
             return None
         prefix_length = len('refs/heads/')
         ref = ref[prefix_length:]
-        sha = payload['head_commit']['id']
+        sha = payload.get('head_commit', {}).get('id')
+        if not sha:
+            return None
         return ref, sha
 
     elif action in ('opened', 'synchronize'):
         # See `tests.func_fixtures.PULL_REQUEST_HOOK_CALL_DATA` for payload
-        gh_pull = github3.pulls.PullRequest(payload['pull_request'])
-        return gh_pull.head.ref, gh_pull.head.sha
-
+        gh_pull = github3.pulls.PullRequest(payload.get('pull_request', {}))
+        try:
+            return gh_pull.head.ref, gh_pull.head.sha
+        except:
+            return None
     else:
         return None
 
@@ -34,13 +38,21 @@ def get_ref_and_sha(payload):
 @csrf.exempt
 @bp.route('/_hooks/hook/<int:id>/', methods=('POST',))
 def hook(id):
+    hook = Hook.query.get_or_404(id)
     payload = json.loads(request.data)
+
+    if set(payload.keys()) == {'zen', 'hook_id'}:
+        # http://developer.github.com/webhooks/#ping-event
+        if hook.gh_id != payload['hook_id']:
+            return 'Wrong hook URL', 400
+        else:
+            return 'OK'
+
     ref_and_sha = get_ref_and_sha(payload)
     if not ref_and_sha:
-        return 'OK'
+        return 'Failed to fetch ref and commit from payload', 400
     ref, sha = ref_and_sha
 
-    hook = Hook.query.get_or_404(id)
     gh_commit = hook.project.gh.git_commit(sha)
 
     build = hook.project.builds.filter(

@@ -66,7 +66,7 @@ def create_app(config=None):
 
 def configure_logging(app):
     app.logger.setLevel(logging.INFO)
-    if not app.debug:
+    if not (app.debug or app.testing):
         handler = logging.StreamHandler()
         app.logger.addHandler(handler)
 

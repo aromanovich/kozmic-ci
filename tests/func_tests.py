@@ -534,6 +534,22 @@ class TestGitHubHooks(TestCase):
 
         do_job_mock.delay.assert_called_once_with(hook_call_id=hook_call.id)
 
+    def test_github_ping_event(self):
+        with mock.patch.object(Project, 'gh'), \
+             mock.patch('kozmic.builds.tasks.do_job') as do_job_mock:
+            url = url_for('builds.hook', id=self.hook_1.id, _external=True)
+            r = self.w.post_json(url, {
+                'zen': 'Hello!',
+                'hook_id': self.hook_1.gh_id
+            })
+            assert r.body == 'OK'
+
+            r = self.w.post_json(url, {
+                'zen': 'Hello!',
+                'hook_id': self.hook_1.gh_id + 123
+            }, expect_errors=True)
+            assert r.body == 'Wrong hook URL'
+
     def test_consecutive_hook_calls(self):
         commit_data = fixtures.COMMIT_47fe2_DATA
         gh_repo_mock = self._create_gh_repo_mock(commit_data)
