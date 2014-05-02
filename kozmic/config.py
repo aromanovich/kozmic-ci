@@ -25,7 +25,7 @@ class DefaultConfig(object):
     SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://kozmic:@127.0.0.1/kozmic'
 
     DOCKER_URL = 'unix://var/run/docker.sock'
-    DOCKER_API_VERSION = '1.8'
+    DOCKER_API_VERSION = '1.10'
 
     BROKER_URL = 'redis://{host}:{port}/{db}'.format(
         host=KOZMIC_REDIS_HOST,

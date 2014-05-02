@@ -1,4 +1,5 @@
 .coverage
+.idea
 
 kozmic/config_local.py
 kozmic/static/.webassets-cache

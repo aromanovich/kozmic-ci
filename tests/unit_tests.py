@@ -429,25 +429,27 @@ class TestDeployKeyDB(TestCase):
         self.user = factories.UserFactory.create()
         self.project = factories.ProjectFactory.create(owner=self.user)
 
-    def test_ensure(self):
+    @mock.patch.object(Project, 'gh')
+    def test_ensure(self, gh_mock):
         self.project.deploy_key.delete()  # Remove the old deploy key
         db.session.commit()
 
-        with mock.patch.object(Project, 'gh') as gh_mock:
-            deploy_key = factories.DeployKeyFactory.build(passphrase='privet')
-            # Note: deploy_key is not commited to the db
-            self.project.deploy_key = deploy_key
+        gh_mock.reset_mock()
 
-            gh_key_mock = mock.MagicMock()
-            gh_key_mock.id = 123
-            gh_mock.create_key.return_value = gh_key_mock
+        deploy_key = factories.DeployKeyFactory.build(passphrase='privet')
+        # Note: deploy_key is not commited to the db
+        self.project.deploy_key = deploy_key
 
-            assert deploy_key.ensure()
+        gh_key_mock = mock.MagicMock()
+        gh_key_mock.id = 123
+        gh_mock.create_key.return_value = gh_key_mock
 
-            assert not gh_mock.key.called
-            gh_mock.create_key.assert_called_once_with(
-                'Kozmic CI key', deploy_key.rsa_public_key)
-            assert deploy_key.gh_id == 123
+        assert deploy_key.ensure()
+
+        assert not gh_mock.key.called
+        gh_mock.create_key.assert_called_once_with(
+            'Kozmic CI key', deploy_key.rsa_public_key)
+        assert deploy_key.gh_id == 123
 
     @mock.patch.object(Project, 'gh')
     def test_delete(self, gh_mock):

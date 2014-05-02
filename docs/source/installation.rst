@@ -43,7 +43,7 @@ Create a directory for Kozmic CI logs::
 
 Create a data-only container that will be used to persist the Kozmic CI data::
     
-    docker run -v /var/lib/docker -v /var/lib/mysql -name kozmic-data ubuntu:12.04 true
+    docker run -v /var/lib/docker -v /var/lib/mysql --name kozmic-data ubuntu:12.04 true
 
 Run Kozmic CI::
 
@@ -53,9 +53,9 @@ Run Kozmic CI::
                      -e=SERVER_NAME=xxx.xxx.xxx.xxx \
                      -p=80:80 \
                      -p=8080:8080 \
-                     -volumes-from kozmic-data \
+                     --volumes-from kozmic-data \
                      -v=$HOME/kozmic-ci/log:/var/log \
-                     -privileged -d aromanovich/kozmic)
+                     --privileged -d aromanovich/kozmic)
     docker logs $JOB
 
 A few comments:
@@ -69,7 +69,7 @@ A few comments:
 * ``-p=80:80 -p=8080:8080`` binds the container ports to the host system.
 * ``-v=$HOME/kozmic-ci/log:/var/log`` mounts the directory from the host into
   the container which make is possible to see what's going on inside.
-* ``-privileged`` key is required for running `Docker within Docker`_.
+* ``--privileged`` key is required for running `Docker within Docker`_.
 
 After starting the container, take a look at the ``logs`` directory content and
 make sure that it doesn't say any errors. That's it!
