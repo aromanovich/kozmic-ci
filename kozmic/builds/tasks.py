@@ -17,6 +17,7 @@ import subprocess
 import fcntl
 import select
 import Queue
+import socket
 
 import redis
 from flask import current_app
@@ -334,7 +335,12 @@ class Builder(threading.Thread):
         logger.info('Docker process %s has started.', self.container)
 
         return_code = self._docker.wait(self.container)
-        logger.info('Docker process log: %s', self._docker.logs(self.container))
+        try:
+            logs = self._docker.logs(self.container)
+        except socket.timeout:
+            pass
+        else:
+            logger.info('Docker process log: %s', logs)
         logger.info('Docker process %s has finished with return code %i.',
                     self.container, return_code)
         logger.info('Builder has finished.')
