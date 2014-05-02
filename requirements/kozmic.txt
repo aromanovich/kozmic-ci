@@ -1,6 +1,6 @@
 PyMySQL==0.6.1
-SQLAlchemy==0.9.3
-redis==2.8.0
+SQLAlchemy==0.9.4
+redis==2.9.1
 celery==3.1.7
 
 Flask==0.10.1
@@ -25,5 +25,5 @@ furl==0.3.5
 github3.py==0.8.1
 certifi==0.0.8
 ipython==1.1.0  # to have nice ./manage.py shell
-docker-py==0.3.0
+docker-py==0.3.1
 raven==4.0.2
