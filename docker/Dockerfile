@@ -26,7 +26,7 @@ ADD ./files/wrapped-docker /bin/wrapped-docker
 ADD ./files/crontab /etc/crontab
 ADD ./files/config.py-docker /config.py-docker
 ADD ./files/run.sh /run.sh
-RUN chmod +x /bin/wrapped-docker /bin/docker /run.sh && \
+RUN chmod +x /bin/wrapped-docker /run.sh && \
     chown root /etc/crontab && \
     chmod 644 /etc/crontab
 
