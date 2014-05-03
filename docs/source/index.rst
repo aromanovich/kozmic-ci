@@ -4,6 +4,8 @@ Kozmic CI
 Kozmic CI is a self-hosted continuous integration service. It is written in Python,
 integrated with GitHub and powered by Docker.
 
+It's main advantages are simplicity and powerful build dependencies caching mechanism.
+
 .. image:: ./history.png
     :width: 1420px
 .. image:: ./build.png

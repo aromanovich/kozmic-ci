@@ -23,7 +23,7 @@ from flask.ext.mail import Mail
 from flask.ext.moment import Moment
 
 
-VERSION = '0.1.0'
+VERSION = '0.0.1'
 
 
 def get_version():
