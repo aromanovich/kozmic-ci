@@ -12,7 +12,7 @@ Flask-Script==0.6.6
 Flask-WTF==0.9.4
 Flask-Login==0.2.9
 Flask-Principal==0.4.0
-Flask-Migrate==1.1.1
+Flask-Migrate==1.2.0
 Flask-OAuth==0.12
 Flask-Assets==0.8
 Flask-Mail==0.9.0
@@ -22,7 +22,7 @@ alembic==0.6.5
 ansi2html==1.0.5
 pycrypto==2.6.1
 furl==0.3.5
-github3.py==0.8.1
+github3.py==0.9.0
 certifi==0.0.8
 ipython==1.1.0  # to have nice ./manage.py shell
 docker-py==0.3.1

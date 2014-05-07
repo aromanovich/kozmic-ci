@@ -15,7 +15,7 @@ import sqlalchemy.dialects.mysql
 import flask
 from Crypto.PublicKey import RSA
 from flask.ext.login import UserMixin
-from flask.ext.principal import Identity, RoleNeed, UserNeed
+from flask.ext.principal import Identity
 from flask.ext.mail import Message
 from werkzeug.utils import cached_property
 from sqlalchemy.ext.declarative import declared_attr
@@ -28,17 +28,6 @@ logger = logging.getLogger(__name__)
 
 
 MISSING_ID = -1
-
-
-# TODO Remove when
-# https://github.com/sigmavirus24/github3.py/commit/35b1f015f526ea881b804076fb111ffc025b2392
-# will be on PyPI
-def iter_collaborators(self, number=-1, etag=None):
-    url = self._build_url('collaborators', base_url=self._api)
-    return self._iter(int(number), url, github3.users.User, {}, etag)
-
-github3.repos.Repository.iter_collaborators = iter_collaborators
-# /TODO
 
 
 class RepositoryBase(object):
