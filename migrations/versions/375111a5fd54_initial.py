@@ -1,13 +1,13 @@
-"""empty message
+"""initial
 
-Revision ID: 4da5ae2d09f5
+Revision ID: 375111a5fd54
 Revises: None
-Create Date: 2013-12-07 00:36:44.507321
+Create Date: 2014-05-06 18:10:28.256558
 
 """
 
 # revision identifiers, used by Alembic.
-revision = '4da5ae2d09f5'
+revision = '375111a5fd54'
 down_revision = None
 
 from alembic import op
@@ -24,19 +24,10 @@ def upgrade():
     sa.Column('gh_access_token', sa.String(length=100), nullable=False),
     sa.Column('gh_avatar_url', sa.String(length=500), nullable=False),
     sa.Column('repos_last_synchronized_at', sa.DateTime(), nullable=True),
+    sa.Column('email', sa.String(length=1000), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('gh_id'),
     sa.UniqueConstraint('gh_login')
-    )
-    op.create_table('user_repository',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('gh_id', sa.Integer(), nullable=False),
-    sa.Column('gh_name', sa.String(length=200), nullable=False),
-    sa.Column('gh_full_name', sa.String(length=200), nullable=False),
-    sa.Column('gh_clone_url', sa.String(length=200), nullable=False),
-    sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
-    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('organization',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -47,6 +38,19 @@ def upgrade():
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index('ix_organization_gh_id', 'organization', ['gh_id'], unique=False)
+    op.create_table('user_repository',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('gh_id', sa.Integer(), nullable=False),
+    sa.Column('gh_name', sa.String(length=200), nullable=False),
+    sa.Column('gh_full_name', sa.String(length=200), nullable=False),
+    sa.Column('gh_ssh_clone_url', sa.String(length=200), nullable=False),
+    sa.Column('gh_https_clone_url', sa.String(length=200), nullable=False),
+    sa.Column('is_public', sa.Boolean(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('project',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('owner_id', sa.Integer(), nullable=False),
@@ -54,26 +58,38 @@ def upgrade():
     sa.Column('gh_name', sa.String(length=200), nullable=False),
     sa.Column('gh_full_name', sa.String(length=200), nullable=False),
     sa.Column('gh_login', sa.String(length=200), nullable=False),
-    sa.Column('gh_clone_url', sa.String(length=200), nullable=False),
-    sa.Column('gh_key_id', sa.Integer(), nullable=False),
-    sa.Column('rsa_private_key', sa.Text(), nullable=False),
-    sa.Column('rsa_public_key', sa.Text(), nullable=False),
+    sa.Column('gh_ssh_clone_url', sa.String(length=200), nullable=False),
+    sa.Column('gh_https_clone_url', sa.String(length=200), nullable=False),
+    sa.Column('is_public', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['owner_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('gh_id')
     )
-    op.create_table('membership',
-    sa.Column('project_id', sa.Integer(), nullable=True),
-    sa.Column('user_id', sa.Integer(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
+    op.create_table('hook',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('project_id', sa.Integer(), nullable=False),
+    sa.Column('gh_id', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(length=200), nullable=False),
+    sa.Column('install_script', sa.Text(), nullable=True),
+    sa.Column('build_script', sa.Text(), nullable=False),
+    sa.Column('docker_image', sa.String(length=200), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['project.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
-    sa.PrimaryKeyConstraint()
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('deploy_key',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('project_id', sa.Integer(), nullable=False),
+    sa.Column('gh_id', sa.Integer(), nullable=False),
+    sa.Column('rsa_private_key', sa.Text(), nullable=False),
+    sa.Column('rsa_public_key', sa.Text(), nullable=False),
+    sa.ForeignKeyConstraint(['project_id'], ['project.id'], ),
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('build',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('project_id', sa.Integer(), nullable=False),
     sa.Column('number', sa.Integer(), nullable=False),
+    sa.Column('gh_commit_ref', sa.String(length=200), nullable=False),
     sa.Column('gh_commit_sha', sa.String(length=40), nullable=False),
     sa.Column('gh_commit_author', sa.String(length=200), nullable=False),
     sa.Column('gh_commit_message', sa.String(length=2000), nullable=False),
@@ -81,35 +97,49 @@ def upgrade():
     sa.Column('status', sa.String(length=40), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['project.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('gh_commit_sha')
+    sa.UniqueConstraint('project_id', 'gh_commit_ref', 'gh_commit_sha', name='unique_ref_and_sha_within_project')
     )
+    op.create_index('ix_build_created_at', 'build', ['created_at'], unique=False)
+    op.create_index('ix_build_number', 'build', ['number'], unique=False)
     op.create_table('organization_repository',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('gh_id', sa.Integer(), nullable=False),
     sa.Column('gh_name', sa.String(length=200), nullable=False),
     sa.Column('gh_full_name', sa.String(length=200), nullable=False),
-    sa.Column('gh_clone_url', sa.String(length=200), nullable=False),
+    sa.Column('gh_ssh_clone_url', sa.String(length=200), nullable=False),
+    sa.Column('gh_https_clone_url', sa.String(length=200), nullable=False),
+    sa.Column('is_public', sa.Boolean(), nullable=False),
     sa.Column('organization_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['organization_id'], ['organization.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('hook',
-    sa.Column('id', sa.Integer(), nullable=False),
+    op.create_table('membership',
     sa.Column('project_id', sa.Integer(), nullable=False),
-    sa.Column('gh_id', sa.Integer(), nullable=False),
-    sa.Column('title', sa.String(length=200), nullable=False),
-    sa.Column('build_script', sa.Text(), nullable=False),
-    sa.Column('docker_image', sa.String(length=200), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('allows_management', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['project.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('project_id', 'user_id')
+    )
+    op.create_table('tracked_file',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('hook_id', sa.Integer(), nullable=False),
+    sa.Column('path', sa.String(length=250, collation='utf8_bin'), nullable=False),
+    sa.ForeignKeyConstraint(['hook_id'], ['hook.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('hook_id', 'path', name='unique_tracked_file_within_hook')
     )
     op.create_table('hook_call',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('hook_id', sa.Integer(), nullable=True),
+    sa.Column('build_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.Column('gh_payload', sa.PickleType(), nullable=False),
+    sa.Column('gh_payload', sa.LargeBinary(), nullable=False),
+    sa.ForeignKeyConstraint(['build_id'], ['build.id'], ),
     sa.ForeignKeyConstraint(['hook_id'], ['hook.id'], ondelete='SET NULL'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('build_id', 'hook_id', name='unique_hook_call_within_build')
     )
     op.create_table('job',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -131,12 +161,17 @@ def downgrade():
     ### commands auto generated by Alembic - please adjust! ###
     op.drop_table('job')
     op.drop_table('hook_call')
-    op.drop_table('hook')
-    op.drop_table('organization_repository')
-    op.drop_table('build')
+    op.drop_table('tracked_file')
     op.drop_table('membership')
+    op.drop_table('organization_repository')
+    op.drop_index('ix_build_number', 'build')
+    op.drop_index('ix_build_created_at', 'build')
+    op.drop_table('build')
+    op.drop_table('deploy_key')
+    op.drop_table('hook')
     op.drop_table('project')
-    op.drop_table('organization')
     op.drop_table('user_repository')
+    op.drop_index('ix_organization_gh_id', 'organization')
+    op.drop_table('organization')
     op.drop_table('user')
     ### end Alembic commands ###

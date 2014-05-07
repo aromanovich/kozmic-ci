@@ -1,7 +1,9 @@
 import os
 import collections
 
-from flask.ext.sqlalchemy import SQLAlchemy
+import sqlalchemy
+from alembic.config import Config
+from alembic.command import upgrade as alembic_upgrade
 from flask.ext.webtest import TestApp, get_scopefunc
 
 from kozmic import create_app, db
@@ -13,11 +15,21 @@ class SQLAlchemyMixin(object):
     def db(self):
         return self.app.extensions['sqlalchemy'].db
 
-    def create_database(self):
+    def create_database(self, use_migrations=True):
         self.db.session = self.db.create_scoped_session({
             'scopefunc': get_scopefunc(),
         })
-        self.db.create_all()
+
+        self.db.session.execute('SET storage_engine=InnoDB;')
+        if use_migrations:
+            try:
+                self.db.session.execute('TRUNCATE alembic_version;')
+            except sqlalchemy.exc.ProgrammingError:
+                self.db.session.rollback()
+            config = Config('migrations/alembic.ini', 'alembic')
+            alembic_upgrade(config, 'head')
+        else:
+            self.db.create_all()
 
     def drop_database(self):
         self.db.drop_all()

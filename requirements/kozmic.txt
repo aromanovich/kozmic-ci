@@ -18,7 +18,7 @@ Flask-Assets==0.8
 Flask-Mail==0.9.0
 Flask-Moment==0.2.1
 
-alembic==0.6.2
+alembic==0.6.5
 ansi2html==1.0.5
 pycrypto==2.6.1
 furl==0.3.5

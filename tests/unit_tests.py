@@ -7,7 +7,6 @@ import Queue
 import datetime as dt
 import hashlib
 import json
-import random
 
 import docker as _docker
 import httpretty
@@ -716,6 +715,7 @@ class TestBuildTaskDB(TestCase):
             hook=self.hook, build=self.build)
 
     def test_do_job(self):
+        hook_call_id = self.hook_call.id
         with SessionScope(self.db):
             with mock.patch.object(Build, 'set_status') as set_status_mock, \
                  mock.patch.object(DeployKey, 'ensure') as ensure_deploy_key_mock, \
@@ -724,7 +724,7 @@ class TestBuildTaskDB(TestCase):
                  mock.patch.multiple('docker.Client', pull=mock.DEFAULT,
                                      inspect_image=mock.DEFAULT):
                 tailer_mock.return_value.has_killed_container = False
-                kozmic.builds.tasks.do_job(hook_call_id=self.hook_call.id)
+                kozmic.builds.tasks.do_job(hook_call_id=hook_call_id)
         self.db.session.rollback()
 
         assert self.build.jobs.count() == 1
