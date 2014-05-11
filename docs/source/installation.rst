@@ -45,7 +45,9 @@ Create a data-only container that will be used to persist the Kozmic CI data::
     
     docker run -v /var/lib/docker -v /var/lib/mysql --name kozmic-data ubuntu:12.04 true
 
-Run Kozmic CI::
+Run Kozmic CI:
+
+.. code-block-w-version-replacement:: shell
 
     JOB=$(docker run -e=SECRET_KEY=xxxxx \
                      -e=GITHUB_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx \
@@ -55,7 +57,7 @@ Run Kozmic CI::
                      -p=8080:8080 \
                      --volumes-from kozmic-data \
                      -v=$HOME/kozmic-ci/log:/var/log \
-                     --privileged -d aromanovich/kozmic)
+                     --privileged -d aromanovich/kozmic:|version|)
     docker logs $JOB
 
 A few comments:
