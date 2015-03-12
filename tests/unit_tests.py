@@ -358,7 +358,7 @@ class TestBuildDB(TestCase):
             build_1.gh_commit_sha,
             'failure',
             target_url=build_1.url,
-            description=description)
+            description=description, context='Kozmic-CI')
 
         # 2. There are members with email addresses
         member_1 = factories.UserFactory.create(email='john@doe.com')
@@ -383,7 +383,7 @@ class TestBuildDB(TestCase):
             build_2.gh_commit_sha,
             'failure',
             target_url=build_2.url,
-            description=description)
+            description=description, context='Kozmic-CI')
 
         # 3. Repeat the same `set_status` call and make sure that we
         # will not be notified the second time
