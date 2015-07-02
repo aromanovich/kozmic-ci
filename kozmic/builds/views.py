@@ -1,4 +1,7 @@
+# coding: utf-8
+
 import json
+import re
 
 import github3
 import sqlalchemy
@@ -38,6 +41,20 @@ def get_ref_and_sha(payload):
 @csrf.exempt
 @bp.route('/_hooks/hook/<int:id>/', methods=('POST',))
 def hook(id):
+    def need_skip_build(gh_commit, payload):
+        search_string = gh_commit.message
+
+        if 'pull_request' in payload:
+            pr_title = payload['pull_request']['title'] or ''
+            pr_body = payload['pull_request']['body'] or ''
+            search_string += pr_title + pr_body
+
+        skip_regexp = re.compile('\[ci\s+skip\]|\[skip\s+ci\]|skip_ci', re.IGNORECASE)
+        if skip_regexp.search(search_string):
+            return True
+        else:
+            return False
+
     hook = Hook.query.get_or_404(id)
     payload = json.loads(request.data)
 
@@ -54,6 +71,10 @@ def hook(id):
     ref, sha = ref_and_sha
 
     gh_commit = hook.project.gh.git_commit(sha)
+
+    # Skip build if message contains si skip pattern
+    if need_skip_build(gh_commit, payload):
+        return 'OK'
 
     build = hook.project.builds.filter(
         Build.gh_commit_ref == ref,
