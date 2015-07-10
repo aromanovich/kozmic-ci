@@ -49,7 +49,7 @@ def hook(id):
             pr_body = payload['pull_request']['body'] or ''
             search_string += pr_title + pr_body
 
-        skip_regexp = re.compile('\[ci\s+skip\]|\[skip\s+ci\]|skip_ci', re.IGNORECASE)
+        skip_regexp = re.compile('\[ci\s+skip\]|\[skip\s+ci\]|skip_ci|ci_skip', re.IGNORECASE)
         if skip_regexp.search(search_string):
             return True
         else:
