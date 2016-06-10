@@ -72,7 +72,7 @@ def hook(id):
 
     gh_commit = hook.project.gh.git_commit(sha)
 
-    # Skip build if message contains si skip pattern
+    # Skip build if message contains ci skip pattern
     if need_skip_build(gh_commit, payload):
         return 'OK'
 
