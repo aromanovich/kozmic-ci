@@ -64,4 +64,4 @@ Compiling the documentation
     cd docs
     KOZMIC_CONFIG=kozmic.config_local.DevelopmentConfig make html
 
-.. _Alembic: http://alembic.readthedocs.org/en/latest/index.html
+.. _Alembic: https://alembic.readthedocs.io/en/latest/index.html

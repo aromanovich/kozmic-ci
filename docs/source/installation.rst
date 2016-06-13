@@ -112,7 +112,7 @@ they must be served through HTTPS to prevent GitHub from caching them
 .. _Digital Ocean: https://www.digitalocean.com/?refcode=429df247edf9
 .. _Docker within Docker: http://blog.docker.io/2013/09/docker-can-now-run-within-docker/
 .. _Supervisor: http://supervisord.org/
-.. _uWSGI: http://uwsgi-docs.readthedocs.org/en/latest/
+.. _uWSGI: https://uwsgi-docs.readthedocs.io/en/latest/
 .. _Kozmic CI's Dockerfile: https://github.com/aromanovich/kozmic-ci/tree/master/docker/Dockerfile
 .. _supervisor.conf: https://github.com/aromanovich/kozmic-ci/blob/master/docker/files/supervisor.conf
 .. _kozmic-uwsgi.ini: https://github.com/aromanovich/kozmic-ci/blob/master/docker/files/kozmic-uwsgi.ini
